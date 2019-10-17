@@ -96,6 +96,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  for(int i = 0; i < 100000000; i++);
   return -1;
 }
 
@@ -499,7 +500,9 @@ setup_stack (void **esp, char **argv, int argc)
         
         
         /* check using hex_dump */
-        //hex_dump(*esp, *esp, 100, 1);
+	/*uintptr_t ofs = (uintptr_t)*esp;
+	int byte_size = 0xc0000000 - ofs;
+        hex_dump(ofs, *esp, byte_size, 1);*/
         
         /* free argv. it did its own job. */
         free(argv);
