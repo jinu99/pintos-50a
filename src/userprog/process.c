@@ -139,7 +139,7 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
-
+
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
 
@@ -203,7 +203,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char ** argv, int argc);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -233,16 +233,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
   
   /* Added: each tokens of the command line. */
   char *token = strtok_r(file_name, " ", &save_pointer);
-  printf("token: %s\n", token);
   /* Added: parse and push it to argv */
-  printf("Start parse\n");
   while(token != NULL){
     argc = argc + 1;
-    realloc(argv, argc * sizeof(char *));
+    argv = realloc(argv, argc * sizeof(char *));
     argv[argc - 1] = token;
-    if(token = strtok_r(NULL, " ", &save_pointer) == NULL) break;
+    token = strtok_r(NULL, " ", &save_pointer);
   }
-  printf("Finish parse\n");
   
 
   /* Allocate and activate page directory. */
@@ -252,7 +249,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open ((const char *)argv[0]);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -332,7 +329,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, argv, argc))
     goto done;
 
   /* Start address. */
@@ -345,7 +342,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
@@ -457,7 +454,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char **argv, int argc) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -467,7 +464,46 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
+      {
         *esp = PHYS_BASE;
+        /* Added: save total length of arguments */
+        int total_length = 0;
+        for (int i = argc - 1; i >= 0; i--)
+        {
+          int arg_length = strlen(argv[i]) + 1; /* Include null char at the end */
+          total_length += arg_length;
+          *esp -= arg_length;
+          strlcpy(*esp, argv[i], arg_length);
+          argv[i] = *esp;   /* to remember where argv[i] stored */
+        }
+        /* word align: set esp to multiple of 4 */
+        *esp -= (total_length % 4 == 0) ? 0 : 4 - (total_length % 4);
+        /* push null */
+        *esp -= 4;
+        **(uint32_t **)esp = 0;
+        /* push address of argv[i] */
+        for (int i = argc - 1; i >= 0; i --)
+        {
+          *esp -= 4;
+          **(uint32_t **)esp = argv[i]; /* use what we saved before */
+        }
+        /* push argv's address */
+        *esp -= 4;
+        **(uint32_t **)esp = *esp + 4;
+        /* push argc */
+        *esp -= 4;
+        **(uint32_t **)esp = argc;
+        /* push return address: NULL */
+        *esp -= 4;
+        **(uint32_t **)esp = 0;
+        
+        
+        /* check using hex_dump */
+        //hex_dump(*esp, *esp, 100, 1);
+        
+        /* free argv. it did its own job. */
+        free(argv);
+      }
       else
         palloc_free_page (kpage);
     }
