@@ -30,6 +30,10 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  /* Added: first command of command line */
+  char *first_cmd;
+  /* Added: to strtok_r */
+  char *save_pointer;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -38,8 +42,12 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  /* Added: we must consider first token of command */
+  first_cmd = strtok_r(file_name, " ", &save_pointer);
+  
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  /* Modified: change thread's name to first command */
+  tid = thread_create (first_cmd, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
