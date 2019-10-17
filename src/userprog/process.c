@@ -223,6 +223,28 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  /* Added: parse each arguments.
+     Also, filesys_open must receive first command, so we use strtok_r to
+     change file_name to first command automatically */
+  char **argv = (char **) malloc(sizeof(char *));     /* Added: arguments */
+  int argc = 0;                                       /* Added: # of arguments */
+  char *save_pointer;                                 /* Added: for strtok_r */
+  
+  
+  /* Added: each tokens of the command line. */
+  char *token = strtok_r(file_name, " ", &save_pointer);
+  printf("token: %s\n", token);
+  /* Added: parse and push it to argv */
+  printf("Start parse\n");
+  while(token != NULL){
+    argc = argc + 1;
+    realloc(argv, argc * sizeof(char *));
+    argv[argc - 1] = token;
+    if(token = strtok_r(NULL, " ", &save_pointer) == NULL) break;
+  }
+  printf("Finish parse\n");
+  
+
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
