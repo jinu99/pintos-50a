@@ -6,6 +6,9 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/fd.h"
+#include "threads/synch.h"
+
+struct lock *file_lock;
 
 static void syscall_handler (struct intr_frame *);
 /* Added: check each arguments are valid, and terminate the process if
@@ -16,6 +19,7 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init(&file_lock);
 }
 
 static void
@@ -28,8 +32,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   /* Added: handle each syscalls */
   uint32_t *cur_esp = (uint32_t *)f->esp;
   
-  int fd;
-  int i, len;
+  struct file *fp;
+  int fd, i, len;
   char *buf;
   char inp;
   
@@ -37,7 +41,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch (*cur_esp)
   {
     case SYS_HALT:
-      //printf("halt!\n");
+      printf("halt!\n");
       shutdown_power_off();
       NOT_REACHED();
       break; 
@@ -50,7 +54,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_EXEC:
-      //printf("exec!\n");
+      printf("exec!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
       	
@@ -58,14 +62,14 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_WAIT:
-      //printf("wait!\n");
+      printf("wait!\n");
       if (!is_user_vaddr(cur_esp + 1))
         sys_exit(-1, f);
       f->eax = process_wait((pid_t)*(cur_esp + 1));
       break;
       
     case SYS_CREATE:
-      //printf("create!\n");
+      printf("create!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 2) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
       	
@@ -74,29 +78,36 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_REMOVE:
-      //printf("remove!\n");
+      printf("remove!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
+
       f->eax = filesys_remove((char *)*(cur_esp + 1));	
       break;
       
     case SYS_OPEN:
-      //printf("open!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
+      printf("open!\n");
+      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
-      f->eax = fd_add(filesys_open((char *)*(cur_esp + 1)));      	
+
+      lock_acquire(&file_lock);
+      if ((fp = filesys_open((char *)*(cur_esp + 1))) != NULL)
+        f->eax = fd_add(fp);
+      else  
+        f->eax = -1;
+      lock_release(&file_lock);
       break;
       
     case SYS_FILESIZE:
-      //printf("filesize!\n");
+      printf("filesize!\n");
       if (!is_user_vaddr(cur_esp + 1) || (fd == (int)*(cur_esp + 1)) < 3)
         sys_exit(-1, f);
-        
+      
       f->eax = inode_length(file_get_inode(fd_get_file(fd)));
       break;
       
     case SYS_READ:
-      //printf("read!\n");
+      printf("read!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 2)) || !is_user_vaddr(cur_esp + 3)) 
       	sys_exit(-1, f);
         
@@ -104,6 +115,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 
       if (len-- <= 0) { f->eax = 0; break;}
       buf = (char *)*(cur_esp + 2);
+      
+      lock_acquire(&file_lock);
       if ((fd = (int)*(cur_esp + 1)) == 0)
       {
         for (i = 0; i < len && (inp = input_getc()) != 0; i++)
@@ -115,14 +128,20 @@ syscall_handler (struct intr_frame *f UNUSED)
 
         f->eax = i;
       }
+      else if (fd < 3)
+      {
+        lock_release(&file_lock);
+        sys_exit(-1, f);
+      }
       else
       {
-        f->eax = file_read(fd, buf, len);
+        f->eax = file_read(fd_get_file(fd), buf, len);
       }
+      lock_release(&file_lock);
       break;
       
     case SYS_WRITE:
-      //printf("write!\n");
+      printf("write!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 2)) || !is_user_vaddr(cur_esp + 3)) 
       	sys_exit(-1, f);
       	
@@ -130,6 +149,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       if (len-- <= 0){f->eax = 0; break;}
       buf = (char *)*(cur_esp + 2);
       
+      lock_acquire(&file_lock);
       if((fd = (int)*(cur_esp + 1)) == 1)
       {
         for (i = 0; *(buf) != 0; i++)
@@ -140,36 +160,41 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
       else if (fd < 3)
       {
+        lock_release(&file_lock);
         sys_exit(-1, f);
       }
       else
       {
-        f->eax = file_write(fd, buf, len);
+        f->eax = file_write(fd_get_file(fd), buf, len);
       }
+      lock_release(&file_lock);
       break;
       
     case SYS_SEEK:
-      //printf("seek!\n");
-      if (!is_user_vaddr(cur_esp + 2) || (fd == (int)*(cur_esp + 1)) < 3)
+      printf("seek!\n");
+      if (!is_user_vaddr(cur_esp + 2) || (fd = (int)*(cur_esp + 1)) < 3)
         sys_exit(-1, f);
         
       file_seek(fd_get_file(fd), (unsigned)*(cur_esp + 2));
       break;      
       
     case SYS_TELL:
-      //printf("tell!\n");
-      if (!is_user_vaddr(cur_esp + 1) || (fd == (int)*(cur_esp + 1)) < 3)
+      printf("tell!\n");
+      if (!is_user_vaddr(cur_esp + 1) || (fd = (int)*(cur_esp + 1)) < 3)
         sys_exit(-1, f);
         
-      f->eax = file_tell((struct file *)*(cur_esp + 1));
+      f->eax = file_tell(fd_get_file(fd));
       break;
       
     case SYS_CLOSE:
-      //printf("close!\n");
-      if (!is_user_vaddr(cur_esp + 1) || (fd == (int)*(cur_esp + 1)) < 3)
+      printf("close!\n");
+      if (!is_user_vaddr(cur_esp + 1) || (fd = (int)*(cur_esp + 1)) < 3)
         sys_exit(-1, f);
+        
+      lock_acquire(&file_lock);
       file_close(fd_get_file(fd));
       fd_delete(fd);
+      lock_release(&file_lock);
       break;
       
     default:
