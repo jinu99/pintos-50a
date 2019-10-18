@@ -97,7 +97,7 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   /* Added: for loop */
-  for(int i = 0; i < 1000000000; i++);
+  for(int i = 0; i < 100000000; i++);
   return -1;
 }
 
@@ -503,7 +503,9 @@ setup_stack (void **esp, char **argv, int argc)
         **(uint32_t **)esp = 0;
         
         /* check using hex_dump */
-        //hex_dump((uintptr_t)*esp, *esp, 0xc0000000 - (uintptr_t)*esp, true);
+	/*uintptr_t ofs = (uintptr_t)*esp;
+	int byte_size = 0xc0000000 - ofs;
+        hex_dump(ofs, *esp, byte_size, 1);*/
         
         /* free argv. it did its own job. */
         free(argv);
