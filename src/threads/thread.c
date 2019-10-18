@@ -178,7 +178,7 @@ thread_create (const char *name, int priority,
   t = palloc_get_page (PAL_ZERO);
   if (t == NULL)
     return TID_ERROR;
-
+  
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
@@ -463,6 +463,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  /* Added: to init additional members for proj 2 */
+  list_init(&t->child_list);
+  sema_init(&t->sema_for_parent, 0); // up when this thread exits.
+  sema_init(&t->sema_for_removing, 0); 
+  //printf("%s inits %s\n", running_thread()->name, t->name);
+  list_push_back(&(running_thread()->child_list), &(t->elem_as_child));
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

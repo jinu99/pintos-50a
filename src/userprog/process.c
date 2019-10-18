@@ -47,6 +47,7 @@ process_execute (const char *file_name)
   
   /* Create a new thread to execute FILE_NAME. */
   /* Modified: change thread's name to first command */
+  //printf("%s spawns %s\n", thread_current()->name, first_cmd);
   tid = thread_create (first_cmd, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
@@ -94,10 +95,32 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  /* Added: for loop */
-  for(int i = 0; i < 100000000; i++);
+  /* Added: wait until the child tid up its sema and exit. */
+  /* if there's no tid child, exit(-1) */
+  struct list_elem *e;
+  struct thread *ch = NULL;
+  int status;
+  struct thread *cur_thread = thread_current();
+  
+  for (e = list_begin(&(cur_thread->child_list)); e != list_end(&(cur_thread->child_list)); e = list_next(e))
+  {
+    /* find tid child and sema up the child's semaphore. */
+    ch = list_entry(e, struct thread, elem_as_child);
+    if (child_tid == ch->tid)
+    {
+      //printf("start waiting: %s\n", thread_current()->name);
+      sema_down(&ch->sema_for_parent);
+      //printf("finish waiting: %s\n", thread_current()->name);
+      status = ch->exit_status;
+      list_remove(&ch->elem_as_child);
+      /* allow child to die. */
+      sema_up(&ch->sema_for_removing);
+      return status;
+    }
+  }
+  /* no tid child found. return -1 */
   return -1;
 }
 
@@ -124,6 +147,11 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  /* Added: sema up for parent to work again. */
+  sema_up(&cur->sema_for_parent);
+  /* wait for parent to clean all this' history */
+  /* if no parent, this will be down right away. */
+  sema_down(&cur->sema_for_removing);
 }
 
 /* Sets up the CPU for running user code in the current
