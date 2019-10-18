@@ -29,6 +29,7 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char *fn_copy2;
   tid_t tid;
   /* Added: first command of command line */
   char *first_cmd;
@@ -38,19 +39,27 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  fn_copy2 = palloc_get_page (0);
+  if (fn_copy == NULL || fn_copy2 == NULL)
     return TID_ERROR;
+
   strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy2, file_name, PGSIZE);
 
   /* Added: we must consider first token of command */
-  first_cmd = strtok_r(file_name, " ", &save_pointer);
+  first_cmd = strtok_r(fn_copy2, " ", &save_pointer);
   
   /* Create a new thread to execute FILE_NAME. */
   /* Modified: change thread's name to first command */
   //printf("%s spawns %s\n", thread_current()->name, first_cmd);
   tid = thread_create (first_cmd, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy2); 
+  }
+
+  if (tid == -2) return -1; // Added
+
   return tid;
 }
 
@@ -72,8 +81,16 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success) {
+    /* Modified: sys_exit */
+    printf("%s: exit(-1)\n", thread_current()->name);
+    thread_current()->exit_status = -1;
+    thread_current()->tid = -2;
+    sema_up(&thread_current()->sema_load);
+    thread_exit();
+  }
+
+  sema_up(&thread_current()->sema_load);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

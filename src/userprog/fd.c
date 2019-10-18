@@ -20,7 +20,7 @@ fd_add (struct file *f)
 void
 fd_delete (int fd)
 {
-  ASSERT(fd > 3); // assert if fd is not valid
+  ASSERT(fd > 2); // assert if fd is not valid
   
   CURRENT_FD(fd - 3) = NULL;
 }
@@ -28,7 +28,8 @@ fd_delete (int fd)
 struct file *
 fd_get_file (int fd)
 {
-  ASSERT(fd > 3); // assert if fd is not valid
+  ASSERT(fd > 2); // assert if fd is not valid
+  if (fd >= MAX_FD) return NULL;
   
   return CURRENT_FD(fd - 3);
 }

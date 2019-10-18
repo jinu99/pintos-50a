@@ -108,6 +108,7 @@ struct thread
     struct list_elem elem_as_child;     /* for parent's child_list */
     struct semaphore sema_for_parent;   /* make parent wait for this's exit */
     struct semaphore sema_for_removing; /* to remove all histories of child(this) */
+    struct semaphore sema_load;		/* Added: for sys_exec */
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

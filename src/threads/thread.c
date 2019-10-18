@@ -201,6 +201,12 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* Added: waituntil child's load goes success or fail */
+  if (strcmp(thread_current()->name, "main")) {
+    sema_down(&t->sema_load);
+    if (t->tid == -2) tid = -2;
+  }
+
   return tid;
 }
 
@@ -468,6 +474,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->child_list);
   sema_init(&t->sema_for_parent, 0); // up when this thread exits.
   sema_init(&t->sema_for_removing, 0); 
+  sema_init(&t->sema_load, 0);		// Added: for sys_exec
   //printf("%s inits %s\n", running_thread()->name, t->name);
   list_push_back(&(running_thread()->child_list), &(t->elem_as_child));
 
