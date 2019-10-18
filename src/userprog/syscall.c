@@ -95,8 +95,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       	sys_exit(-1, f);
 
       lock_acquire(&file_lock);
-      if ((fp = filesys_open((char *)*(cur_esp + 1))) != NULL)
+      if ((fp = filesys_open((char *)*(cur_esp + 1))) != NULL){
+        /* If filename is current thread, deny writing! */
+        if (!strcmp(thread_current()->name, (char *)*(cur_esp + 1))){
+          file_deny_write(fp);
+        }
         f->eax = fd_add(fp);
+      }
       else
         f->eax = -1;
       lock_release(&file_lock);
@@ -172,8 +177,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
       else
       {
-        if ((fp = fd_get_file(fd)) != NULL) {
-          f->eax = file_write(fd_get_file(fd), buf, len);
+        /* if fp is the file pointer of current file, do not write */
+        fp = fd_get_file(fd);
+        if (fp != NULL) {
+          if (fp->deny_write)
+            f->eax = 0;
+          else
+            f->eax = file_write(fd_get_file(fd), buf, len);
         }
         else f->eax = -1;
       }
