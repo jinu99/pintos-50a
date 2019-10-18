@@ -96,6 +96,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  /* Added: for loop */
+  for(int i = 0; i < 1000000000; i++);
   return -1;
 }
 
@@ -232,6 +234,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   
   
   /* Added: each tokens of the command line. */
+  //printf("start parse\n");
   char *token = strtok_r(file_name, " ", &save_pointer);
   /* Added: parse and push it to argv */
   while(token != NULL){
@@ -240,7 +243,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     argv[argc - 1] = token;
     token = strtok_r(NULL, " ", &save_pointer);
   }
-  
+  //printf("finish parse\n");
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -255,7 +258,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-
+  //printf("try to file_read\n");
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -268,7 +271,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
-
+  //printf("try to read headers\n");
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
@@ -329,6 +332,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
+  //printf("set up stack\n");
   if (!setup_stack (esp, argv, argc))
     goto done;
 
@@ -466,6 +470,7 @@ setup_stack (void **esp, char **argv, int argc)
       if (success)
       {
         *esp = PHYS_BASE;
+        //printf("start setting stack\n");
         /* Added: save total length of arguments */
         int total_length = 0;
         for (int i = argc - 1; i >= 0; i--)
@@ -497,9 +502,8 @@ setup_stack (void **esp, char **argv, int argc)
         *esp -= 4;
         **(uint32_t **)esp = 0;
         
-        
         /* check using hex_dump */
-        //hex_dump(*esp, *esp, 100, 1);
+        //hex_dump((uintptr_t)*esp, *esp, 0xc0000000 - (uintptr_t)*esp, true);
         
         /* free argv. it did its own job. */
         free(argv);
