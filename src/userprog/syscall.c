@@ -29,7 +29,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   char *buf;
   char inp;
   
-  hex_dump(cur_esp, cur_esp, 100, true);
+  //hex_dump(cur_esp, cur_esp, 100, true);
   switch (*cur_esp)
   {
     case SYS_HALT:
@@ -38,7 +38,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       NOT_REACHED();
       break; 
     case SYS_EXIT:
-      printf("exit!\n");
+      printf("%s: exit(%d)\n", thread_current()->name, (int)*(cur_esp + 1));
       cur_eax = (int)*(cur_esp + 1);
       thread_exit();
       break;
@@ -74,7 +74,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       printf("read!\n");
       valid_ptr_or_die ((char *)*(cur_esp + 8));
       len = (unsigned)*(cur_esp + 12);
-      if (len-- <= 0) { *cur_eax = 0; break;}
+      if (len-- <= 0) { cur_eax = 0; break;}
       buf = (char *)*(cur_esp + 8);
       if ((fd = (struct file *)*(cur_esp + 4)) == 0)
       {
@@ -84,23 +84,23 @@ syscall_handler (struct intr_frame *f UNUSED)
 
         }
         *buf = 0;
-        *cur_eax = i;
+        cur_eax = i;
       }
       else
       {
-        *cur_eax = file_read(fd, buf, len);
+        cur_eax = file_read(fd, buf, len);
       }
       break;
     case SYS_WRITE:
       printf("write!\n");
       valid_ptr_or_die ((char *)*(cur_esp + 2));
       len = (unsigned)*(cur_esp + 3);
-      if (len-- <= 0){*cur_eax = 0; break;}
+      if (len-- <= 0){cur_eax = 0; break;}
       buf = (char *)*(cur_esp + 2);
       
       if((fd = (struct file *)*(cur_esp + 1)) == 1)
       {
-        for (i = 0; i < len && i < strlen(buf) + 1 && strlen(buf) != 0; i++)
+        for (i = 0; i < len && *(buf) != NULL; i++)
         {
           printf("%c", *(buf++));
         }
@@ -126,7 +126,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     default:
       thread_exit();
   }
-  printf("Survive Signal %d at %x!\n", *cur_esp, cur_esp);
+  //printf("Survive Signal %d at %x!\n", *cur_esp, cur_esp);
 }
 
 /* Added: check validity of arguments and terminate the thread
