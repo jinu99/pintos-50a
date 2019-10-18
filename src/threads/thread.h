@@ -7,7 +7,6 @@
 #include "threads/synch.h"
 #include "userprog/fd.h"
 
-
 /* States in a thread's life cycle. */
 enum thread_status
   {

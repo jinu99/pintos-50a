@@ -21,6 +21,8 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+//int pallocno = 0;
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -39,7 +41,10 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
+  //printf("palloc open! opened pallocs = %d\n", ++pallocno);
   fn_copy2 = palloc_get_page (0);
+  //printf("palloc open! opened pallocs = %d\n", ++pallocno);
+  
   if (fn_copy == NULL || fn_copy2 == NULL)
     return TID_ERROR;
 
@@ -53,9 +58,13 @@ process_execute (const char *file_name)
   /* Modified: change thread's name to first command */
   //printf("%s spawns %s\n", thread_current()->name, first_cmd);
   tid = thread_create (first_cmd, PRI_DEFAULT, start_process, fn_copy);
+
+  //printf("palloc freed! opened pallocs = %d\n", --pallocno);
+  palloc_free_page (fn_copy2); 
+
   if (tid == TID_ERROR) {
+    //printf("palloc freed! opened pallocs = %d\n", --pallocno);
     palloc_free_page (fn_copy); 
-    palloc_free_page (fn_copy2); 
   }
 
   if (tid == -2) return -1; // Added
@@ -80,6 +89,7 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
+  //printf("palloc freed! opened pallocs = %d\n", --pallocno);
   palloc_free_page (file_name);
   if (!success) {
     /* Modified: sys_exit */
@@ -276,6 +286,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char **argv = (char **) malloc(sizeof(char *));     /* Added: arguments */
   int argc = 0;                                       /* Added: # of arguments */
   char *save_pointer;                                 /* Added: for strtok_r */
+  //printf("malloc open! opened mallocs = %d\n", ++mallocno);
   
   
   /* Added: each tokens of the command line. */
@@ -473,6 +484,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
+      //printf("palloc open! opened pallocs = %d\n", ++pallocno);
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
@@ -480,6 +492,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
+          //printf("palloc freed! opened pallocs = %d\n", --pallocno);
           palloc_free_page (kpage);
           return false; 
         }
@@ -488,6 +501,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
+          //printf("palloc freed! opened pallocs = %d\n", --pallocno);
           palloc_free_page (kpage);
           return false; 
         }
@@ -507,7 +521,8 @@ setup_stack (void **esp, char **argv, int argc)
 {
   uint8_t *kpage;
   bool success = false;
-
+  
+  //printf("palloc open! opened pallocs = %d\n", ++pallocno);
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
@@ -553,10 +568,12 @@ setup_stack (void **esp, char **argv, int argc)
         hex_dump(ofs, *esp, byte_size, 1);*/
         
         /* free argv. it did its own job. */
+        //printf("malloc freed! opened mallocs = %d\n", --mallocno);
         free(argv);
       }
-      else
-        palloc_free_page (kpage);
+      else {
+        //printf("palloc freed! opened pallocs = %d\n", --pallocno);
+        palloc_free_page (kpage);}
     }
   return success;
 }

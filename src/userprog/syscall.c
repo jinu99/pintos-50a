@@ -208,15 +208,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_CLOSE:
       //printf("close!\n");
-      if (!is_user_vaddr(cur_esp + 1) || (fd = (int)*(cur_esp + 1)) < 3)
-        sys_exit(-1, f);
-        
-      lock_acquire(&file_lock);
-      if ((fp = fd_get_file(fd)) != NULL) {
-        file_close(fp); 
-        fd_delete(fd);
-      }
-      lock_release(&file_lock);
+      sys_close ((int)*(cur_esp + 1), f);
       break;
       
     default:
@@ -238,10 +230,36 @@ is_valid_ptr (void * ptr)
   return false;
 }
 
+void 
+sys_close (int fd, struct intr_frame *f)
+{
+  struct file *fp;
+  
+  if (!is_user_vaddr(f->esp + 4) || fd < 3)
+    sys_exit(-1, f);
+
+  lock_acquire(&file_lock);
+  if ((fp = fd_get_file(fd)) != NULL) {
+    file_close(fp); 
+    fd_delete(fd);
+  }
+  lock_release(&file_lock);
+}
+
 void
 sys_exit (int status, struct intr_frame *f) 
 {
+  int i;
+  struct list_elem *e;
+
   printf("%s: exit(%d)\n", thread_current()->name, status);
+  
+  if (is_user_vaddr(f->esp + 4)) {
+    for (i = 0; i < MAX_FD; i++) {
+      sys_close(i + 3, f);
+    }
+  }
+  
   thread_current()->exit_status = status;
   f->eax = status;
   thread_exit();
