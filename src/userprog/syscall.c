@@ -4,12 +4,12 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "lib/user/syscall.h"
+#include "threads/vaddr.h"
 
 static void syscall_handler (struct intr_frame *);
 /* Added: check each arguments are valid, and terminate the process if
    the arguments are invalid. */
-void valid_ptr_or_die (void * ptr);
+bool is_valid_ptr (void * ptr);
 
 void
 syscall_init (void) 
@@ -20,6 +20,9 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+  if (!is_valid_ptr((uint32_t *)f->esp))
+    sys_exit(-1, f);
+    
   /* Added: handle each syscalls */
   uint32_t *cur_esp = (uint32_t *)f->esp;
   uint32_t cur_eax = (uint32_t)f->eax; /* For return value of intr_frame */
@@ -33,50 +36,75 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch (*cur_esp)
   {
     case SYS_HALT:
-      printf("halt!\n");
+      //printf("halt!\n");
       shutdown_power_off();
       NOT_REACHED();
       break; 
+      
     case SYS_EXIT:
-      printf("%s: exit(%d)\n", thread_current()->name, (int)*(cur_esp + 1));
-      cur_eax = (int)*(cur_esp + 1);
-      thread_exit();
+      if (!is_user_vaddr(cur_esp + 1))
+        sys_exit(-1, f);
+        
+      sys_exit((int)*(cur_esp + 1), f);
       break;
+      
     case SYS_EXEC:
-      printf("exec!\n");
-      valid_ptr_or_die ((char *)*(cur_esp + 4));
-      cur_eax = process_execute((char*)*(cur_esp + 4));
+      //printf("exec!\n");
+      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1)) 
+      	sys_exit(-1, f);
+      	
+      cur_eax = process_execute((char*)*(cur_esp + 1));
       break;
+      
     case SYS_WAIT:
-      printf("wait!\n");
-      cur_eax = process_wait((pid_t)*(cur_esp + 4));
+      //printf("wait!\n");
+      if (!is_user_vaddr(cur_esp + 1))
+        sys_exit(-1, f);
+        
+      cur_eax = process_wait((pid_t)*(cur_esp + 1));
       break;
+      
     case SYS_CREATE:
-      printf("create!\n");
-      valid_ptr_or_die ((char *)*(cur_esp + 4));
-      cur_eax = filesys_create((char *)*(cur_esp + 4), (unsigned)*(cur_esp + 8));
+      //printf("create!\n");
+      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 2)) 
+      	sys_exit(-1, f);
+      	
+      cur_eax = filesys_create((char *)*(cur_esp + 1), (unsigned)*(cur_esp + 2));
       break;
+      
     case SYS_REMOVE:
-      printf("remove!\n");
-      valid_ptr_or_die ((char *)*(cur_esp + 4));
-      cur_eax = filesys_remove((char *)*(cur_esp+4));
+      //printf("remove!\n");
+      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1)) 
+      	sys_exit(-1, f);
+      	
+      cur_eax = filesys_remove((char *)*(cur_esp + 1));
       break;
+      
     case SYS_OPEN:
-      printf("open!\n");
-      valid_ptr_or_die ((char *)*(cur_esp + 4));
-      cur_eax = (int)filesys_open((char *)*(cur_esp + 4));
+      //printf("open!\n");
+      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1)) 
+      	sys_exit(-1, f);
+      	
+      cur_eax = (int)filesys_open((char *)*(cur_esp + 1));
       break;
+      
     case SYS_FILESIZE:
-      printf("filesize!\n");
-      cur_eax = inode_length(file_get_inode((struct file *)*(cur_esp + 4)));
+      //printf("filesize!\n");
+      if (!is_user_vaddr(cur_esp + 1))
+        sys_exit(-1, f);
+        
+      cur_eax = inode_length(file_get_inode((struct file *)*(cur_esp + 1)));
       break;
+      
     case SYS_READ:
-      printf("read!\n");
-      valid_ptr_or_die ((char *)*(cur_esp + 8));
-      len = (unsigned)*(cur_esp + 12);
+      //printf("read!\n");
+      if (!is_valid_ptr((char *)*(cur_esp + 2)) || !is_user_vaddr(cur_esp + 3)) 
+      	sys_exit(-1, f);
+        
+      len = (unsigned)*(cur_esp + 3);
       if (len-- <= 0) { cur_eax = 0; break;}
-      buf = (char *)*(cur_esp + 8);
-      if ((fd = (struct file *)*(cur_esp + 4)) == 0)
+      buf = (char *)*(cur_esp + 2);
+      if ((fd = (struct file *)*(cur_esp + 1)) == 0)
       {
         for (i = 0; i < len && (inp = input_getc()) != 0; i++)
         {
@@ -91,16 +119,19 @@ syscall_handler (struct intr_frame *f UNUSED)
         cur_eax = file_read(fd, buf, len);
       }
       break;
+      
     case SYS_WRITE:
-      printf("write!\n");
-      valid_ptr_or_die ((char *)*(cur_esp + 2));
+      //printf("write!\n");
+      if (!is_valid_ptr((char *)*(cur_esp + 2)) || !is_user_vaddr(cur_esp + 3)) 
+      	sys_exit(-1, f);
+      	
       len = (unsigned)*(cur_esp + 3);
       if (len-- <= 0){cur_eax = 0; break;}
       buf = (char *)*(cur_esp + 2);
       
       if((fd = (struct file *)*(cur_esp + 1)) == 1)
       {
-        for (i = 0; i < len && *(buf) != NULL; i++)
+        for (i = 0; *(buf) != 0; i++)
         {
           printf("%c", *(buf++));
         }
@@ -111,18 +142,31 @@ syscall_handler (struct intr_frame *f UNUSED)
         cur_eax = file_write(fd, buf, len);
       }
       break;
+      
     case SYS_SEEK:
-      printf("seek!\n");
-      file_seek((struct file *)*(cur_esp + 4), (unsigned)*(cur_esp + 8));
+      //printf("seek!\n");
+      if (!is_user_vaddr(cur_esp + 2))
+        sys_exit(-1, f);
+        
+      file_seek((struct file *)*(cur_esp + 1), (unsigned)*(cur_esp + 2));
       break;      
+      
     case SYS_TELL:
-      printf("tell!\n");
-      cur_eax = file_tell((struct file *)*(cur_esp + 4));
+      //printf("tell!\n");
+      if (!is_user_vaddr(cur_esp + 1))
+        sys_exit(-1, f);
+        
+      cur_eax = file_tell((struct file *)*(cur_esp + 1));
       break;
+      
     case SYS_CLOSE:
-      printf("close!\n");
-      cur_eax = file_close((struct file *)*(cur_esp + 4));
+      //printf("close!\n");
+      if (!is_user_vaddr(cur_esp + 1))
+        sys_exit(-1, f);
+        
+      cur_eax = file_close((struct file *)*(cur_esp + 1));
       break;
+      
     default:
       thread_exit();
   }
@@ -132,12 +176,29 @@ syscall_handler (struct intr_frame *f UNUSED)
 /* Added: check validity of arguments and terminate the thread
    if there are invalid arguments. We should release locks and free
    allocations. */
-void
-valid_ptr_or_die (void * ptr)
+bool
+is_valid_ptr (void * ptr)
 {
   if (ptr != NULL)
     if(pagedir_get_page(thread_current()->pagedir, ptr) != NULL)
-      return;
-  printf("Your arguments are invalid: %x\n", ptr);
+      return true;
+  //printf("Your arguments are invalid: %x\n", ptr);
+  return false;
+}
+
+void
+sys_exit (int status, struct intr_frame *f) 
+{
+  printf("%s: exit(%d)\n", thread_current()->name, status);
+  f->eax = status;
   thread_exit();
 }
+
+
+
+
+
+
+
+
+
