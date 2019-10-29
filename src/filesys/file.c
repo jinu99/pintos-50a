@@ -5,6 +5,7 @@
 
 /* An open file. */
 struct file;
+//int fileno = 0;
 
 /* Opens a file for the given INODE, of which it takes ownership,
    and returns the new file.  Returns a null pointer if an
@@ -12,6 +13,7 @@ struct file;
 struct file *
 file_open (struct inode *inode) 
 {
+  //printf("file open! opened files = %d\n", ++fileno);
   struct file *file = calloc (1, sizeof *file);
   if (inode != NULL && file != NULL)
     {
@@ -40,6 +42,7 @@ file_reopen (struct file *file)
 void
 file_close (struct file *file) 
 {
+  //printf("file close! opened files = %d\n", --fileno);
   if (file != NULL)
     {
       file_allow_write (file);
