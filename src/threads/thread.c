@@ -204,7 +204,9 @@ thread_create (const char *name, int priority,
   /* Added: waituntil child's load goes success or fail */
   if (strcmp(thread_current()->name, "main")) {
     sema_down(&t->sema_load);
-    if (t->tid == -2) tid = -2;
+    if (t->tid == -2) {
+      tid = -2;
+    }
   }
 
   return tid;
