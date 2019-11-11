@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -90,7 +91,7 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   //printf("palloc freed! opened pallocs = %d\n", --pallocno);
-  palloc_free_page (file_name);
+  frame_free (file_name);
   if (!success) {
     /* Modified: sys_exit */
     printf("%s: exit(-1)\n", thread_current()->name);
@@ -485,7 +486,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
       //printf("palloc open! opened pallocs = %d\n", ++pallocno);
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      uint8_t *kpage = frame_alloc (PAL_USER);
       if (kpage == NULL)
         return false;
 
@@ -493,7 +494,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           //printf("palloc freed! opened pallocs = %d\n", --pallocno);
-          palloc_free_page (kpage);
+          frame_free (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -502,7 +503,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       if (!install_page (upage, kpage, writable)) 
         {
           //printf("palloc freed! opened pallocs = %d\n", --pallocno);
-          palloc_free_page (kpage);
+          frame_free (kpage);
           return false; 
         }
 
@@ -523,7 +524,7 @@ setup_stack (void **esp, char **argv, int argc)
   bool success = false;
   
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = frame_alloc (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -573,7 +574,7 @@ setup_stack (void **esp, char **argv, int argc)
       }
       else {
         //printf("palloc freed! opened pallocs = %d\n", --pallocno);
-        palloc_free_page (kpage);}
+        frame_free (kpage);}
     }
   return success;
 }
@@ -584,7 +585,7 @@ setup_stack (void **esp, char **argv, int argc)
    otherwise, it is read-only.
    UPAGE must not already be mapped.
    KPAGE should probably be a page obtained from the user pool
-   with palloc_get_page().
+   with frame_alloc().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
 static bool
