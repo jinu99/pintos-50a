@@ -91,7 +91,7 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   //printf("palloc freed! opened pallocs = %d\n", --pallocno);
-  frame_free (file_name);
+  palloc_free_page (file_name);
   if (!success) {
     /* Modified: sys_exit */
     printf("%s: exit(-1)\n", thread_current()->name);
