@@ -7,25 +7,23 @@
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
-#include "lib/kernel/list.h"
+#include "lib/kernel/hash.h"
 
 void frame_table_init (void) {
-  list_init(&frame_table);
+  hash_init(&frame_table, &hash_function, &hash_less, NULL);
   lock_init(&frame_lock);
 }
 
 void* frame_alloc (enum palloc_flags flags/*, struct sup_page_entry *spte*/) {
   if ((flags & PAL_USER) == 0)
     return NULL;
+      
   void *frame = palloc_get_page(flags);
-
-  if (frame){
-    printf("alloc 0x%x\n", frame);
+  if (frame)
     frame_add_to_table(frame/*, spte*/);
-  }
   else 
     PANIC ("Frame could not be allocated because frame is full!");
-  
+    
   /*else {
     while (!frame) {
       frame = frame_evict(flags);
@@ -35,20 +33,20 @@ void* frame_alloc (enum palloc_flags flags/*, struct sup_page_entry *spte*/) {
       PANIC ("Frame could not be evicted because swap is full!");
       
     frame_add_to_table(frame, spte); 
-  }
-  */
+  }*/
   print_frame_table(0);
   return frame;
 }
 
 void frame_free (void *frame) {
+  struct hash_iterator i;
   lock_acquire(&frame_lock);
-  printf("free 0x%x\n", frame);
-  struct list_elem *e;
-  for(e = list_begin(&frame_table); e != list_end(&frame_table); e = list_next(e)) {
-    struct frame_table_elem *elem = list_entry(e, struct frame_table_elem, frame_elem);
+  
+  hash_first (&i, &frame_table);
+  while (hash_next(&i)) {
+    struct frame_table_elem *elem = hash_entry(i.elem, struct frame_table_elem, frame_elem);
     if (elem->user_page == frame) {
-      list_remove(&elem->frame_elem);
+      hash_delete(&frame_table, &elem->frame_elem);
       free(elem);
       palloc_free_page(frame);
       break;
@@ -65,27 +63,10 @@ void frame_add_to_table (void *frame/*, struct sup_page_entry *spte*/)
   //fte->spte = spte;
   elem->holder = thread_current();
   lock_acquire(&frame_lock);
-  list_push_back(&frame_table, &elem->frame_elem);
+  hash_insert(&frame_table, &elem->frame_elem);
   lock_release(&frame_lock);
 }
 
-void print_frame_table(int mode){
-  struct list_elem *e;
-  int n = 0;
-  
-  lock_acquire(&frame_lock);
-  switch(mode){
-  case 0: printf("after allocation\n"); break;
-  case 1: printf("after free\n"); break;
-  }
-  printf("=====================================================\n");
-  for(e = list_begin(&frame_table); e != list_end(&frame_table); e = list_next(e)) {
-    struct frame_table_elem *elem = list_entry(e, struct frame_table_elem, frame_elem);
-    printf("%2d: { Thread %s, VA 0x%x, Pinned %s }\n", n++, elem->holder->name, elem->user_page, elem->pinned ? "true" : "false");
-  }
-  printf("=====================================================\n");
-  lock_release(&frame_lock);
-}
 /*void* frame_evict (enum palloc_flags flags)
 {
   lock_acquire(&frame_table_lock);
@@ -135,3 +116,37 @@ void print_frame_table(int mode){
 	}
     }
 }*/
+
+unsigned hash_function (const struct hash_elem *e, void *aux) {
+  struct frame_table_elem *elem = hash_entry(e, struct frame_table_elem, frame_elem);
+  
+  return hash_bytes(&elem->user_page, sizeof(elem->user_page));
+}
+
+bool hash_less (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+  struct frame_table_elem *elem_a = hash_entry(a, struct frame_table_elem, frame_elem);
+  struct frame_table_elem *elem_b = hash_entry(b, struct frame_table_elem, frame_elem);
+    
+  return elem_a->user_page < elem_b->user_page;
+}
+
+
+void print_frame_table(int mode){
+  struct hash_iterator i;
+  int n = 0;
+  
+  lock_acquire(&frame_lock);
+  switch(mode){
+  case 0: printf("after allocation\n"); break;
+  case 1: printf("after free\n"); break;
+  }
+  
+  printf("=======================================================\n");
+  hash_first(&i, &frame_table);
+  while(hash_next(&i)){
+    struct frame_table_elem *elem = hash_entry(hash_cur(&i), struct frame_table_elem, frame_elem);
+    printf("%2d: { Thread %s, VA 0x%x, Pinned %s }\n", n++, elem->holder->name, elem->user_page, elem->pinned ? "true" : "false");
+  }
+  printf("=======================================================\n");
+  lock_release(&frame_lock);
+}

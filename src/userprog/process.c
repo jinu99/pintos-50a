@@ -42,6 +42,8 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
+  printf("- fn_copy allocated at 0x%x\n", fn_copy);
+  printf("- this address is at %s\n", is_user_vaddr(fn_copy) ? "USER" : "KERNEL");
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
   fn_copy2 = palloc_get_page (0);
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
@@ -494,7 +496,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          //printf("palloc freed! opened pallocs = %d\n", --pallocno);
+          //printf("palloc freed! opened pallocs = \n");
           frame_free (kpage);
           return false; 
         }
@@ -503,7 +505,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          //printf("palloc freed! opened pallocs = %d\n", --pallocno);
+          //printf("palloc freed! opened pallocs = \n");
           frame_free (kpage);
           return false; 
         }
@@ -574,7 +576,7 @@ setup_stack (void **esp, char **argv, int argc)
         free(argv);
       }
       else {
-        //printf("palloc freed! opened pallocs = %d\n", --pallocno);
+        //printf("palloc freed! opened pallocs = \n");
         frame_free (kpage);}
     }
   return success;
