@@ -145,7 +145,7 @@ void print_frame_table(int mode){
   hash_first(&i, &frame_table);
   while(hash_next(&i)){
     struct frame_table_elem *elem = hash_entry(hash_cur(&i), struct frame_table_elem, frame_elem);
-    printf("%2d: { Thread %s, VA 0x%x }\n", n++, elem->holder->name, elem->frame ? "true" : "false");
+    printf("%2d: { Thread %s, VA 0x%x }\n", n++, elem->holder->name, elem->frame);
   }
   printf("=======================================================\n");
   lock_release(&frame_lock);
