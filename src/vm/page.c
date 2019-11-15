@@ -4,33 +4,33 @@
 #include "threads/interrupt.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
-#include "threadshread.h"
+#include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
 #include "vm/page.h"
-#include "vm/swap.h"
+//#include "vm/swap.h"
 
 void page_table_init (struct hash *spt) {
-  hash_init (spt, page_hash_func, page_less_func, NULL);
+  hash_init (spt, page_hash_function, page_less_function, NULL);
 }
 
 void page_table_destroy (struct hash *spt) {
-  hash_destroy (spt, page_action_func);
+  hash_destroy (spt, page_action_function);
 }
 
-struct sup_page_entry* get_spte (void *uva) {  
-  struct sup_page_entry spte;
+/*struct sup_page_elem* get_spte (void *uva) {  
+  struct sup_page_elem spte;
   spte.uva = pg_round_down(uva);
 
   struct hash_elem *e = hash_find(&thread_current()->spt, &spte.elem);
   if (!e) return NULL;
-  return hash_entry (e, struct sup_page_entry, elem);
-}
+  return hash_entry (e, struct sup_page_elem, elem);
+}*/
 
-bool load_page (struct sup_page_entry *spte)
+/*bool load_page (struct sup_page_elem *spte)
 {
   bool success = false;
   spte->pinned = true;
@@ -48,9 +48,9 @@ bool load_page (struct sup_page_entry *spte)
       break;
   }
   return success;
-}
+}*/
 
-bool load_swap (struct sup_page_entry *spte)
+/*bool load_swap (struct sup_page_elem *spte)
 {
   uint8_t *frame = frame_alloc (PAL_USER, spte);
   if (!frame) return false;
@@ -61,9 +61,9 @@ bool load_swap (struct sup_page_entry *spte)
   swap_in(spte->swap_index, spte->uva);
   spte->is_loaded = true;
   return true;
-}
+}*/
 
-bool load_file (struct sup_page_entry *spte)
+/*bool load_file (struct sup_page_elem *spte)
 {
   enum palloc_flags flags = PAL_USER;
   if (spte->read_bytes == 0)
@@ -71,15 +71,15 @@ bool load_file (struct sup_page_entry *spte)
   uint8_t *frame = frame_alloc(flags, spte);
   if (!frame) return false;
   if (spte->read_bytes > 0) {
-    lock_acquire(&filesys_lock);
+    lock_acquire(&file_lock);
     if ((int) spte->read_bytes != file_read_at(spte->file, frame,
                             spte->read_bytes,
                             spte->offset)) {
-      lock_release(&filesys_lock);
+      lock_release(&file_lock);
       frame_free(frame);
       return false;
     }
-    lock_release(&filesys_lock);
+    lock_release(&file_lock);
     memset(frame + spte->read_bytes, 0, spte->zero_bytes);
   }
 
@@ -90,12 +90,12 @@ bool load_file (struct sup_page_entry *spte)
 
   spte->is_loaded = true;  
   return true;
-}
+}*/
 
 bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
-                  uint32_t read_bytes, uint32_t zero_bytes,
-                  bool writable) {
-  struct sup_page_entry *spte = malloc(sizeof(struct sup_page_entry));
+                             uint32_t read_bytes, uint32_t zero_bytes,
+                             bool writable) {
+  struct sup_page_elem *spte = malloc(sizeof(struct sup_page_elem));
   if (!spte) return false; 
   spte->file = file;
   spte->offset = ofs;
@@ -107,12 +107,14 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
   spte->type = FILE;
   spte->pinned = false;
 
-  return (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
+  bool ret = (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
+  print_page_table();
+  return ret;
 }
 
-bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
-                 uint32_t read_bytes, uint32_t zero_bytes) {
-  struct sup_page_entry *spte = malloc(sizeof(struct sup_page_entry));
+/*bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
+                            uint32_t read_bytes, uint32_t zero_bytes) {
+  struct sup_page_elem *spte = malloc(sizeof(struct sup_page_elem));
   if (!spte) return false;
     spte->file = file;
   spte->offset = ofs;
@@ -139,7 +141,7 @@ bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
 bool grow_stack (void *uva) {
   if ((size_t) (PHYS_BASE - pg_round_down(uva)) > MAX_STACK_SIZE)
         return false;
-  struct sup_page_entry *spte = malloc(sizeof(struct sup_page_entry));
+  struct sup_page_elem *spte = malloc(sizeof(struct sup_page_elem));
   if (!spte)  return false;
     
   spte->uva = pg_round_down(uva);
@@ -163,18 +165,42 @@ bool grow_stack (void *uva) {
   if (intr_context()) spte->pinned = false;
 
   return (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
-}
+}*/
 
 unsigned page_hash_function (const struct hash_elem *e, void *aux UNUSED) {
-  struct sup_page_entry *spte = hash_entry(e, struct sup_page_entry, elem);
+  struct sup_page_elem *spte = hash_entry(e, struct sup_page_elem, elem);
   return hash_int((int) spte->uva);
 }
 
 bool page_less_function (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED) {
-  struct sup_page_entry *sa = hash_entry(a, struct sup_page_entry, elem);
-  struct sup_page_entry *sb = hash_entry(b, struct sup_page_entry, elem);
+  struct sup_page_elem *sa = hash_entry(a, struct sup_page_elem, elem);
+  struct sup_page_elem *sb = hash_entry(b, struct sup_page_elem, elem);
   if (sa->uva < sb->uva)
     return true;
   return false;
+}
+
+void page_action_function (struct hash_elem *e, void *aux UNUSED) {
+  struct sup_page_elem *spte = hash_entry(e, struct sup_page_elem, elem);
+  
+  if (spte->is_loaded) {
+    frame_free(pagedir_get_page(thread_current()->pagedir, spte->uva));
+    pagedir_clear_page(thread_current()->pagedir, spte->uva);
+  }
+  
+  free(spte);
+}
+
+void print_page_table(void){
+  struct hash_iterator i;
+  int n = 0;
+  
+  printf("=======================================================\n");
+  hash_first(&i, &thread_current()->spt);
+  while(hash_next(&i)){
+    struct sup_page_elem *elem = hash_entry(hash_cur(&i), struct sup_page_elem, elem);
+    printf("%2d: { UVA 0x%x }\n", n++, elem->uva);
+  }
+  printf("=======================================================\n");
 }
 

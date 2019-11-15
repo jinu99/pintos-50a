@@ -12,7 +12,7 @@
 // 256 KB
 #define MAX_STACK_SIZE (1 << 23)
 
-struct sup_page_entry {
+struct sup_page_elem {
 	uint8_t type;
 	void *uva;
 	bool writable;
@@ -35,16 +35,21 @@ struct sup_page_entry {
 void page_table_init (struct hash *spt);
 void page_table_destroy (struct hash *spt);
 
-bool load_page (struct sup_page_entry *spte);
-bool load_mmap (struct sup_page_entry *spte);
-bool load_swap (struct sup_page_entry *spte);
-bool load_file (struct sup_page_entry *spte);
+bool load_page (struct sup_page_elem *spte);
+bool load_mmap (struct sup_page_elem *spte);
+bool load_swap (struct sup_page_elem *spte);
+bool load_file (struct sup_page_elem *spte);
 bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
-							 uint32_t read_bytes, uint32_t zero_bytes,
-							 bool writable);
+                             uint32_t read_bytes, uint32_t zero_bytes,
+                             bool writable);
 bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
-							uint32_t read_bytes, uint32_t zero_bytes);
+                            uint32_t read_bytes, uint32_t zero_bytes);
 bool grow_stack (void *uva);
-struct sup_page_entry* get_spte (void *uva);
+struct sup_page_elem* get_spte (void *uva);
+
+unsigned page_hash_function (const struct hash_elem *e, void *aux UNUSED);
+bool page_less_function (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
+void page_action_function (struct hash_elem *e, void *aux UNUSED);
+void print_page_table(void);
 
 #endif /* vm/page.h */

@@ -8,8 +8,6 @@
 #include "userprog/fd.h"
 #include "threads/synch.h"
 
-struct lock *file_lock;
-
 static void syscall_handler (struct intr_frame *);
 /* Added: check each arguments are valid, and terminate the process if
    the arguments are invalid. */

@@ -10,17 +10,17 @@
 #include "lib/kernel/hash.h"
 
 void frame_table_init (void) {
-  hash_init(&frame_table, &hash_function, &hash_less, NULL);
+  hash_init(&frame_table, frame_hash_function, frame_less_function, NULL);
   lock_init(&frame_lock);
 }
 
-void* frame_alloc (enum palloc_flags flags/*, struct sup_page_entry *spte*/) {
+void* frame_alloc (enum palloc_flags flags, struct sup_page_elem *spte) {
   if ((flags & PAL_USER) == 0)
     return NULL;
       
   void *frame = palloc_get_page(flags);
   if (frame)
-    frame_add_to_table(frame/*, spte*/);
+    frame_add_to_table(frame, spte);
   else 
     PANIC ("Frame could not be allocated because frame is full!");
     
@@ -45,7 +45,7 @@ void frame_free (void *frame) {
   hash_first (&i, &frame_table);
   while (hash_next(&i)) {
     struct frame_table_elem *elem = hash_entry(i.elem, struct frame_table_elem, frame_elem);
-    if (elem->user_page == frame) {
+    if (elem->frame == frame) {
       hash_delete(&frame_table, &elem->frame_elem);
       free(elem);
       palloc_free_page(frame);
@@ -56,11 +56,11 @@ void frame_free (void *frame) {
   print_frame_table(1);
 }
 
-void frame_add_to_table (void *frame/*, struct sup_page_entry *spte*/)
+void frame_add_to_table (void *frame, struct sup_page_elem *spte)
 {
   struct frame_table_elem *elem = malloc(sizeof(struct frame_table_elem));
-  elem->user_page = frame;
-  //fte->spte = spte;
+  elem->frame = frame;
+  elem->spte = spte;
   elem->holder = thread_current();
   lock_acquire(&frame_lock);
   hash_insert(&frame_table, &elem->frame_elem);
@@ -74,38 +74,38 @@ void frame_add_to_table (void *frame/*, struct sup_page_entry *spte*/)
   
   while (true)
     {
-      struct frame_entry *fte = list_entry(e, struct frame_entry, elem);
-      if (!fte->spte->pinned)
+      struct frame_entry *elem = list_entry(e, struct frame_entry, elem);
+      if (!elem->spte->pinned)
 	{
-	  struct thread *t = fte->thread;
-	  if (pagedir_is_accessed(t->pagedir, fte->spte->uva))
+	  struct thread *t = elem->thread;
+	  if (pagedir_is_accessed(t->pagedir, elem->spte->uva))
 	    {
-	      pagedir_set_accessed(t->pagedir, fte->spte->uva, false);
+	      pagedir_set_accessed(t->pagedir, elem->spte->uva, false);
 	    }
 	  else
 	    {
-	      if (pagedir_is_dirty(t->pagedir, fte->spte->uva) ||
-		  fte->spte->type == SWAP)
+	      if (pagedir_is_dirty(t->pagedir, elem->spte->uva) ||
+		  elem->spte->type == SWAP)
 		{
-		  if (fte->spte->type == MMAP)
+		  if (elem->spte->type == MMAP)
 		    {
 		      lock_acquire(&filesys_lock);
-		      file_write_at(fte->spte->file, fte->frame,
-				    fte->spte->read_bytes,
-				    fte->spte->offset);
+		      file_write_at(elem->spte->file, elem->frame,
+				    elem->spte->read_bytes,
+				    elem->spte->offset);
 		      lock_release(&filesys_lock);
 		    }
 		  else
 		    {
-		      fte->spte->type = SWAP;
-		      fte->spte->swap_index = swap_out(fte->frame);
+		      elem->spte->type = SWAP;
+		      elem->spte->swap_index = swap_out(elem->frame);
 		    }
 		}
-	      fte->spte->is_loaded = false;
-	      list_remove(&fte->elem);
-	      pagedir_clear_page(t->pagedir, fte->spte->uva);
-	      palloc_free_page(fte->frame);
-	      free(fte);
+	      elem->spte->is_loaded = false;
+	      list_remove(&elem->elem);
+	      pagedir_clear_page(t->pagedir, elem->spte->uva);
+	      palloc_free_page(elem->frame);
+	      free(elem);
 	      return palloc_get_page(flags);
 	    }
 	}
@@ -117,17 +117,17 @@ void frame_add_to_table (void *frame/*, struct sup_page_entry *spte*/)
     }
 }*/
 
-unsigned hash_function (const struct hash_elem *e, void *aux) {
+unsigned frame_hash_function (const struct hash_elem *e, void *aux) {
   struct frame_table_elem *elem = hash_entry(e, struct frame_table_elem, frame_elem);
   
-  return hash_bytes(&elem->user_page, sizeof(elem->user_page));
+  return hash_bytes(&elem->frame, sizeof(elem->frame));
 }
 
-bool hash_less (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+bool frame_less_function (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
   struct frame_table_elem *elem_a = hash_entry(a, struct frame_table_elem, frame_elem);
   struct frame_table_elem *elem_b = hash_entry(b, struct frame_table_elem, frame_elem);
     
-  return elem_a->user_page < elem_b->user_page;
+  return elem_a->frame < elem_b->frame;
 }
 
 
@@ -145,7 +145,7 @@ void print_frame_table(int mode){
   hash_first(&i, &frame_table);
   while(hash_next(&i)){
     struct frame_table_elem *elem = hash_entry(hash_cur(&i), struct frame_table_elem, frame_elem);
-    printf("%2d: { Thread %s, VA 0x%x, Pinned %s }\n", n++, elem->holder->name, elem->user_page, elem->pinned ? "true" : "false");
+    printf("%2d: { Thread %s, VA 0x%x }\n", n++, elem->holder->name, elem->frame ? "true" : "false");
   }
   printf("=======================================================\n");
   lock_release(&frame_lock);

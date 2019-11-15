@@ -98,11 +98,8 @@ main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
-
-#ifdef VM
-  /* Added: initializing frame table */
+  
   frame_table_init();
-#endif
 
   /* Segmentation. */
 #ifdef USERPROG
@@ -120,11 +117,12 @@ main (void)
   syscall_init ();
 #endif
 
+
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
   serial_init_queue ();
   timer_calibrate ();
-
+  
 #ifdef FILESYS
   /* Initialize file system. */
   ide_init ();

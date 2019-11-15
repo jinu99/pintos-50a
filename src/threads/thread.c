@@ -11,7 +11,10 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#ifdef VM
 #include "vm/frame.h"
+#include "vm/page.h"
+#endif
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -110,7 +113,8 @@ thread_start (void)
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
-
+  
+  
   /* Start preemptive thread scheduling. */
   intr_enable ();
 
@@ -224,7 +228,7 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-
+  
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
 }
@@ -473,11 +477,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  
   /* Added: to init additional members for proj 2 */
   list_init(&t->child_list);
   sema_init(&t->sema_for_parent, 0); // up when this thread exits.
   sema_init(&t->sema_for_removing, 0); 
   sema_init(&t->sema_load, 0);		// Added: for sys_exec
+  
   //printf("%s inits %s\n", running_thread()->name, t->name);
   list_push_back(&(running_thread()->child_list), &(t->elem_as_child));
 

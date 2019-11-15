@@ -3,6 +3,7 @@
 
 #include <debug.h>
 #include <list.h>
+#include <hash.h>
 #include <stdint.h>
 #include "threads/synch.h"
 #include "userprog/fd.h"
@@ -104,11 +105,14 @@ struct thread
 
     /* Added: for process_wait(tid) in proj 2 */
     struct list child_list;             /* list of child */
-    int exit_status;              /* child's exit status */
+    int exit_status;                    /* child's exit status */
     struct list_elem elem_as_child;     /* for parent's child_list */
     struct semaphore sema_for_parent;   /* make parent wait for this's exit */
     struct semaphore sema_for_removing; /* to remove all histories of child(this) */
-    struct semaphore sema_load;		/* Added: for sys_exec */
+    struct semaphore sema_load;		      /* Added: for sys_exec */
+    
+    /* Added: for managing virtual memory */
+    struct hash spt;                    /* Added: thread's supplementary page table */
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

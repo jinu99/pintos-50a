@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -83,6 +84,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  page_table_init(&thread_current()->spt);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -177,6 +179,10 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+    
+  /* Added: destroy sup page table */
+  page_table_destroy(&cur->spt);
+    
   /* Added: sema up for parent to work again. */
   sema_up(&cur->sema_for_parent);
   /* wait for parent to clean all this' history */
@@ -489,7 +495,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
       //printf("palloc open! opened pallocs = %d\n", ++pallocno);
-      uint8_t *kpage = frame_alloc (PAL_USER);
+      uint8_t *kpage = frame_alloc (PAL_USER, NULL);
       if (kpage == NULL)
         return false;
 
@@ -509,6 +515,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           frame_free (kpage);
           return false; 
         }
+      
+      if (!add_file_to_page_table(file, ofs, upage, page_read_bytes,
+				  page_zero_bytes, writable))
+	      return false;
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -527,7 +537,7 @@ setup_stack (void **esp, char **argv, int argc)
   bool success = false;
   
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
-  kpage = frame_alloc (PAL_USER | PAL_ZERO);
+  kpage = frame_alloc (PAL_USER | PAL_ZERO, NULL);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
