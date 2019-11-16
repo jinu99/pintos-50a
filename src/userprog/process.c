@@ -43,8 +43,6 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  printf("- fn_copy allocated at 0x%x\n", fn_copy);
-  printf("- this address is at %s\n", is_user_vaddr(fn_copy) ? "USER" : "KERNEL");
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
   fn_copy2 = palloc_get_page (0);
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
@@ -413,10 +411,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   return success;
 }
 
-/* load() helpers. */
-
-static bool install_page (void *upage, void *kpage, bool writable);
-
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
 static bool
@@ -601,7 +595,7 @@ setup_stack (void **esp, char **argv, int argc)
    with frame_alloc().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();

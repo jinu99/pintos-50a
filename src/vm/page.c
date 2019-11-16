@@ -21,14 +21,14 @@ void page_table_destroy (struct hash *spt) {
   hash_destroy (spt, page_action_function);
 }
 
-/*struct sup_page_elem* get_spte (void *uva) {  
+struct sup_page_elem* get_spte (void *uva) {  
   struct sup_page_elem spte;
   spte.uva = pg_round_down(uva);
 
   struct hash_elem *e = hash_find(&thread_current()->spt, &spte.elem);
   if (!e) return NULL;
   return hash_entry (e, struct sup_page_elem, elem);
-}*/
+}
 
 /*bool load_page (struct sup_page_elem *spte)
 {
@@ -108,7 +108,7 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
   spte->pinned = false;
 
   bool ret = (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
-  print_page_table();
+  //print_page_table();
   return ret;
 }
 
@@ -116,7 +116,7 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
                             uint32_t read_bytes, uint32_t zero_bytes) {
   struct sup_page_elem *spte = malloc(sizeof(struct sup_page_elem));
   if (!spte) return false;
-    spte->file = file;
+  spte->file = file;
   spte->offset = ofs;
   spte->uva = upage;
   spte->read_bytes = read_bytes;
@@ -136,36 +136,29 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
     return false;
   }
   return true;
-}
+}*/
 
-bool grow_stack (void *uva) {
-  if ((size_t) (PHYS_BASE - pg_round_down(uva)) > MAX_STACK_SIZE)
-        return false;
-  struct sup_page_elem *spte = malloc(sizeof(struct sup_page_elem));
-  if (!spte)  return false;
-    
+bool expand_stack (void *uva) {
+  if (PHYS_BASE - pg_round_down(uva) > MAX_STACK_SIZE)
+    return false;
+  
+  struct sup_page_elem *spte = (struct sup_page_elem *) malloc(sizeof(struct sup_page_elem));
+  if (!spte) return false;
+  
   spte->uva = pg_round_down(uva);
-  spte->is_loaded = true;
   spte->writable = true;
-  spte->type = SWAP;
-  spte->pinned = true;
-
-  uint8_t *frame = frame_alloc (PAL_USER, spte);
-  if (!frame) {
-    free(spte);
-    return false;
-  }
-
+  
+  void *frame = frame_alloc(PAL_USER, spte);
+  if (!frame) { free(spte); return false; }
+  
   if (!install_page(spte->uva, frame, spte->writable)) {
-    free(spte);
     frame_free(frame);
+    free(spte);
     return false;
   }
-
-  if (intr_context()) spte->pinned = false;
 
   return (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
-}*/
+}
 
 unsigned page_hash_function (const struct hash_elem *e, void *aux UNUSED) {
   struct sup_page_elem *spte = hash_entry(e, struct sup_page_elem, elem);

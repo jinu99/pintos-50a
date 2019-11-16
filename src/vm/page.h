@@ -9,8 +9,7 @@
 #define MMAP 2
 #define HASH_ERROR 3
 
-// 256 KB
-#define MAX_STACK_SIZE (1 << 23)
+#define MAX_STACK_SIZE (1 << 23) // 8MB
 
 struct sup_page_elem {
 	uint8_t type;
@@ -44,7 +43,7 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
                              bool writable);
 bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
                             uint32_t read_bytes, uint32_t zero_bytes);
-bool grow_stack (void *uva);
+bool expand_stack (void *uva);
 struct sup_page_elem* get_spte (void *uva);
 
 unsigned page_hash_function (const struct hash_elem *e, void *aux UNUSED);
