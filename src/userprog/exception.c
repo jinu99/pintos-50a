@@ -4,7 +4,11 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "userprog/process.h"
+#include "vm/page.h"
+#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -149,20 +153,49 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  /* To implement virtual memory, delete the rest of the function
+     body, and replace it with code that brings in the page to
+     which fault_addr refers. */
+  printf("PAGE FAULT AT 0x%x\n", fault_addr);
   bool solved = false;
-  if (not_present) { 
-    struct sup_page_elem *e = get_spte(fault_addr); 
-    if (!e && (fault_addr >= f->esp - 32))
-      solved = expand_stack(fault_addr);
+  if (not_present && fault_addr >= 0x08048000 && is_user_vaddr(fault_addr)){
+    struct sup_page_elem *spte = get_spte(fault_addr);
+    if (spte){
+      enum palloc_flags flags = PAL_USER;
+      if (spte->read_bytes == 0)
+        flags |= PAL_ZERO;
+      uint8_t *frame = frame_alloc(flags, spte);
+      if (!frame) printf("failed to allocate\n");
+      else {
+        // load from file to frame
+        int a = file_read_at(spte->file, frame, spte->read_bytes, spte->offset);
+        int b = spte->read_bytes > PGSIZE ? PGSIZE : spte->read_bytes;
+        if(spte->read_bytes < PGSIZE)
+          memset(frame + spte->read_bytes, 0, spte->zero_bytes);
+        printf("%d == %d\n", a, b);
+        if (!install_page(spte->uva, frame, spte->writable)) {
+          frame_free(frame);
+          printf("failed to connect\n");
+        }
+        else{
+          printf("succeed to connect\n");
+          spte->is_loaded = true;
+          solved = true;
+        }
+      }
+    }
   }
-  
-  if (!solved) {
+  if (!solved){
     printf ("Page fault at %p: %s error %s page in %s context.\n",
             fault_addr,
             not_present ? "not present" : "rights violation",
             write ? "writing" : "reading",
             user ? "user" : "kernel");
     kill (f);
+  }
+  else {
+    print_frame_table();
+    print_page_table();
   }
 }
 

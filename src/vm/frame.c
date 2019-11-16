@@ -4,6 +4,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
@@ -74,7 +75,7 @@ void frame_add_to_table (void *frame, struct sup_page_elem *spte)
   
   while (true)
     {
-      struct frame_entry *elem = list_entry(e, struct frame_entry, elem);
+      struct frame_table_elem *elem = list_entry(e, struct frame_table_elem, elem);
       if (!elem->spte->pinned)
 	{
 	  struct thread *t = elem->thread;
@@ -145,7 +146,7 @@ void print_frame_table(int mode){
   hash_first(&i, &frame_table);
   while(hash_next(&i)){
     struct frame_table_elem *elem = hash_entry(hash_cur(&i), struct frame_table_elem, frame_elem);
-    printf("%2d: { Thread %s, VA 0x%x }\n", n++, elem->holder->name, elem->frame);
+    printf("%2d: { Thread %s, VA 0x%x, SPTE 0x%x }\n", n++, elem->holder->name, elem->frame, elem->spte);
   }
   printf("=======================================================\n");
   lock_release(&frame_lock);
