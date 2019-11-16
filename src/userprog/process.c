@@ -43,8 +43,7 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  printf("- fn_copy allocated at 0x%x\n", fn_copy);
-  printf("- this address is at %s\n", is_user_vaddr(fn_copy) ? "USER" : "KERNEL");
+
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
   fn_copy2 = palloc_get_page (0);
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
@@ -415,7 +414,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
+bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -494,27 +493,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      //printf("palloc open! opened pallocs = %d\n", ++pallocno);
-      uint8_t *kpage = frame_alloc (PAL_USER, NULL);
+      /*uint8_t *kpage = frame_alloc (PAL_USER, NULL);
       if (kpage == NULL)
         return false;
 
-      /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          //printf("palloc freed! opened pallocs = \n");
           frame_free (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          //printf("palloc freed! opened pallocs = \n");
           frame_free (kpage);
           return false; 
-        }
+        }*/
       
       if (!add_file_to_page_table(file, ofs, upage, page_read_bytes,
 				  page_zero_bytes, writable))
@@ -523,6 +516,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
+      //ofs += page_read_bytes;
       upage += PGSIZE;
     }
   return true;
@@ -537,6 +531,7 @@ setup_stack (void **esp, char **argv, int argc)
   bool success = false;
   
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
+  printf("stack alloc : ");
   kpage = frame_alloc (PAL_USER | PAL_ZERO, NULL);
   if (kpage != NULL) 
     {
@@ -601,8 +596,7 @@ setup_stack (void **esp, char **argv, int argc)
    with frame_alloc().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
-install_page (void *upage, void *kpage, bool writable)
+bool install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
 

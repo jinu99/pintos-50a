@@ -21,14 +21,14 @@ void page_table_destroy (struct hash *spt) {
   hash_destroy (spt, page_action_function);
 }
 
-/*struct sup_page_elem* get_spte (void *uva) {  
+struct sup_page_elem* get_spte (void *uva) {  
   struct sup_page_elem spte;
   spte.uva = pg_round_down(uva);
 
   struct hash_elem *e = hash_find(&thread_current()->spt, &spte.elem);
   if (!e) return NULL;
   return hash_entry (e, struct sup_page_elem, elem);
-}*/
+}
 
 /*bool load_page (struct sup_page_elem *spte)
 {
@@ -199,7 +199,7 @@ void print_page_table(void){
   hash_first(&i, &thread_current()->spt);
   while(hash_next(&i)){
     struct sup_page_elem *elem = hash_entry(hash_cur(&i), struct sup_page_elem, elem);
-    printf("%2d: { UVA 0x%x }\n", n++, elem->uva);
+    printf("%2d: { AT 0x%x, UVA 0x%x, FILE 0x%x, pinned %s, is_loaded %s }\n", n++, elem, elem->uva, elem->file, elem->pinned ? "yes" : "no", elem->is_loaded ? "yes" : "no");
   }
   printf("=======================================================\n");
 }
