@@ -30,7 +30,7 @@ struct sup_page_elem* get_spte (void *uva) {
   return hash_entry (e, struct sup_page_elem, elem);
 }
 
-/*bool load_page (struct sup_page_elem *spte)
+bool load_page (struct sup_page_elem *spte)
 {
   bool success = false;
   spte->pinned = true;
@@ -48,11 +48,11 @@ struct sup_page_elem* get_spte (void *uva) {
       break;
   }
   return success;
-}*/
+}
 
-/*bool load_swap (struct sup_page_elem *spte)
+bool load_swap (struct sup_page_elem *spte)
 {
-  uint8_t *frame = frame_alloc (PAL_USER, spte);
+  /*uint8_t *frame = frame_alloc (PAL_USER, spte);
   if (!frame) return false;
     if (!install_page(spte->uva, frame, spte->writable)) {  
     frame_free(frame);
@@ -60,10 +60,11 @@ struct sup_page_elem* get_spte (void *uva) {
   }
   swap_in(spte->swap_index, spte->uva);
   spte->is_loaded = true;
-  return true;
-}*/
+  return true;*/
+  return false;
+}
 
-/*bool load_file (struct sup_page_elem *spte)
+bool load_file (struct sup_page_elem *spte)
 {
   enum palloc_flags flags = PAL_USER;
   if (spte->read_bytes == 0)
@@ -90,7 +91,7 @@ struct sup_page_elem* get_spte (void *uva) {
 
   spte->is_loaded = true;  
   return true;
-}*/
+}
 
 bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
                              uint32_t read_bytes, uint32_t zero_bytes,
@@ -192,7 +193,7 @@ void print_page_table(void){
   hash_first(&i, &thread_current()->spt);
   while(hash_next(&i)){
     struct sup_page_elem *elem = hash_entry(hash_cur(&i), struct sup_page_elem, elem);
-    printf("%2d: { AT 0x%x, UVA 0x%x, FILE 0x%x, pinned %s, is_loaded %s }\n", n++, elem, elem->uva, elem->file, elem->pinned ? "yes" : "no", elem->is_loaded ? "yes" : "no");
+    printf("%2d: { AT 0x%x, UVA 0x%x, FILE 0x%x, ofs %d, is_loaded %s }\n", n++, elem, elem->uva, elem->file, elem->offset, elem->is_loaded ? "yes" : "no");
   }
   printf("=======================================================\n");
 }
