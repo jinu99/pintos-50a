@@ -11,7 +11,7 @@
 #include "userprog/syscall.h"
 #include "vm/frame.h"
 #include "vm/page.h"
-//#include "vm/swap.h"
+#include "vm/swap.h"
 
 void page_table_init (struct hash *spt) {
   hash_init (spt, page_hash_function, page_less_function, NULL);
@@ -52,16 +52,15 @@ bool load_page (struct sup_page_elem *spte)
 
 bool load_swap (struct sup_page_elem *spte)
 {
-  /*uint8_t *frame = frame_alloc (PAL_USER, spte);
+  uint8_t *frame = frame_alloc (PAL_USER, spte);
   if (!frame) return false;
-    if (!install_page(spte->uva, frame, spte->writable)) {  
+  if (!install_page(spte->uva, frame, spte->writable)) {  
     frame_free(frame);
     return false;
   }
   swap_in(spte->swap_index, spte->uva);
   spte->is_loaded = true;
-  return true;*/
-  return false;
+  return true;
 }
 
 bool load_file (struct sup_page_elem *spte)
@@ -195,7 +194,7 @@ void print_page_table(void){
   hash_first(&i, &thread_current()->spt);
   while(hash_next(&i)){
     struct sup_page_elem *elem = hash_entry(hash_cur(&i), struct sup_page_elem, elem);
-    printf("%2d: { AT 0x%x, UVA 0x%x, FILE 0x%x, ofs %d, is_loaded %s }\n", n++, elem, elem->uva, elem->file, elem->offset, elem->is_loaded ? "yes" : "no");
+    printf("%2d: { AT 0x%x, UVA 0x%x, FILE 0x%x, ofs %d, is_loaded %s, pinned = %s }\n", n++, elem, elem->uva, elem->file, elem->offset, elem->is_loaded ? "yes" : "no", elem->pinned ? "yes" : "no");
   }
   printf("=======================================================\n");
 }

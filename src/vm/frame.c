@@ -1,5 +1,6 @@
 #include "filesys/file.h"
 #include <stdio.h>
+#include <stdbool.h>
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
@@ -8,6 +9,8 @@
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
+#include "vm/page.h"
+#include "vm/swap.h"
 #include "lib/kernel/hash.h"
 
 void frame_table_init (void) {
@@ -20,21 +23,18 @@ void* frame_alloc (enum palloc_flags flags, struct sup_page_elem *spte) {
     return NULL;
       
   void *frame = palloc_get_page(flags);
+  #ifdef DEBUGTOOL
+  printf("alloc! \n");
+  #endif
   if (frame)
-    frame_add_to_table(frame, spte);
-  else 
-    PANIC ("Frame could not be allocated because frame is full!");
-    
-  /*else {
-    while (!frame) {
-      frame = frame_evict(flags);
-      lock_release(&frame_table_lock); 
-    }
+    frame_add_to_table(frame, spte);    
+  else {
+    frame = frame_evict(flags);
     if (!frame)
       PANIC ("Frame could not be evicted because swap is full!");
       
     frame_add_to_table(frame, spte); 
-  }*/
+  }
   #ifdef DEBUGTOOL
     print_frame_table(0);
   #endif
@@ -72,55 +72,86 @@ void frame_add_to_table (void *frame, struct sup_page_elem *spte)
   lock_release(&frame_lock);
 }
 
-/*void* frame_evict (enum palloc_flags flags)
-{
-  lock_acquire(&frame_table_lock);
-  struct list_elem *e = list_begin(&frame_table);
+void* frame_evict (enum palloc_flags flags) {
+  struct hash_iterator i, j;
+  bool pin_check = false;
+  lock_acquire(&frame_lock);
   
-  while (true)
-    {
-      struct frame_table_elem *elem = list_entry(e, struct frame_table_elem, elem);
-      if (!elem->spte->pinned)
-	{
-	  struct thread *t = elem->thread;
-	  if (pagedir_is_accessed(t->pagedir, elem->spte->uva))
-	    {
+  #ifdef DEBUGTOOL
+  printf("evict!\n");
+  #endif
+
+  hash_first (&i, &frame_table);
+  hash_next (&i);
+  while (true) {
+    #ifdef DEBUGTOOL
+    printf("1 evict!\n");
+    #endif
+    struct frame_table_elem *elem = hash_entry(hash_cur(&i), struct frame_table_elem, frame_elem);
+    #ifdef DEBUGTOOL
+    printf("0x%08x\n", elem->spte);
+    #endif
+    
+    if (!(elem->spte)) {
+      #ifdef DEBUGTOOL
+      printf("1.5 evict!\n");
+      #endif
+      hash_next(&i);
+      if (!(i.elem)) { 
+        if (!pin_check)  { lock_release(&frame_lock); return NULL; }
+        hash_first (&i, &frame_table); hash_next (&i); }
+      continue;
+    }
+    
+    if (!elem->spte->pinned) {
+      pin_check = true;
+      #ifdef DEBUGTOOL
+      printf("2 evict!\n");
+      #endif
+	    struct thread *t = elem->holder;
+	    if (pagedir_is_accessed(t->pagedir, elem->spte->uva)) {
+	      #ifdef DEBUGTOOL
+        printf("3 evict!\n");
+        #endif
 	      pagedir_set_accessed(t->pagedir, elem->spte->uva, false);
-	    }
-	  else
-	    {
-	      if (pagedir_is_dirty(t->pagedir, elem->spte->uva) ||
-		  elem->spte->type == SWAP)
-		{
-		  if (elem->spte->type == MMAP)
-		    {
-		      lock_acquire(&filesys_lock);
-		      file_write_at(elem->spte->file, elem->frame,
-				    elem->spte->read_bytes,
-				    elem->spte->offset);
-		      lock_release(&filesys_lock);
+	      }
+	      
+	    else {
+	      #ifdef DEBUGTOOL
+        printf("4 evict!\n");
+        #endif
+	      if (pagedir_is_dirty(t->pagedir, elem->spte->uva) || elem->spte->type == SWAP) {
+	        elem->spte->type = SWAP;
+          elem->spte->swap_index = swap_out(elem->frame); 
 		    }
-		  else
-		    {
-		      elem->spte->type = SWAP;
-		      elem->spte->swap_index = swap_out(elem->frame);
-		    }
-		}
+		    #ifdef DEBUGTOOL
+        printf("5 evict!\n");
+        #endif
 	      elem->spte->is_loaded = false;
-	      list_remove(&elem->elem);
+	      list_remove(&elem->frame_elem);
 	      pagedir_clear_page(t->pagedir, elem->spte->uva);
 	      palloc_free_page(elem->frame);
 	      free(elem);
-	      return palloc_get_page(flags);
+	      void* ret = palloc_get_page(flags);
+	      lock_release(&frame_lock);
+	      #ifdef DEBUGTOOL
+        printf("6 evict!\n");
+        #endif
+	      return ret;
 	    }
-	}
-      e = list_next(e);
-      if (e == list_end(&frame_table))
-	{
-	  e = list_begin(&frame_table);
-	}
-    }
-}*/
+	  }
+	  #ifdef DEBUGTOOL
+    printf("7 evict!\n");
+    #endif
+    hash_next(&i);
+    if (!(i.elem)) { 
+      if (!pin_check) { lock_release(&frame_lock); return NULL; }
+      hash_first (&i, &frame_table); hash_next (&i); }
+  }
+  #ifdef DEBUGTOOL
+  printf("evict done!\n");
+  #endif
+}
 
 unsigned frame_hash_function (const struct hash_elem *e, void *aux) {
   struct frame_table_elem *elem = hash_entry(e, struct frame_table_elem, frame_elem);
@@ -150,7 +181,7 @@ void print_frame_table(int mode){
   hash_first(&i, &frame_table);
   while(hash_next(&i)){
     struct frame_table_elem *elem = hash_entry(hash_cur(&i), struct frame_table_elem, frame_elem);
-    printf("%2d: { Thread %s, VA 0x%x, SPTE 0x%x }\n", n++, elem->holder->name, elem->frame, elem->spte);
+    printf("%2d: { Thread %s, VA 0x%x, SPTE 0x%x, addr 0x%08x }\n", n++, elem->holder->name, elem->frame, elem->spte, elem);
   }
   printf("=======================================================\n");
   lock_release(&frame_lock);

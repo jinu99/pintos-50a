@@ -37,6 +37,7 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+#include "vm/swap.h"
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
@@ -55,7 +56,7 @@ static const char *swap_bdev_name;
 #endif /* FILESYS */
 
 /* -ul: Maximum number of pages to put into palloc's user pool. */
-static size_t user_page_limit = SIZE_MAX;
+static size_t user_page_limit = 16;
 
 static void bss_init (void);
 static void paging_init (void);
@@ -129,7 +130,10 @@ main (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
-
+  
+  /* Added for Swap slot init */
+  swap_init();
+  
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */
