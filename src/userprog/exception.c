@@ -156,33 +156,17 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf("PAGE FAULT AT 0x%x\n", fault_addr);
+  #ifdef DEBUGTOOL
+    printf("PAGE FAULT AT 0x%x\n", fault_addr);
+  #endif
   bool solved = false;
   if (not_present && fault_addr >= 0x08048000 && is_user_vaddr(fault_addr)){
     struct sup_page_elem *spte = get_spte(fault_addr);
-    if (spte){
-      enum palloc_flags flags = PAL_USER;
-      if (spte->read_bytes == 0)
-        flags |= PAL_ZERO;
-      uint8_t *frame = frame_alloc(flags, spte);
-      if (!frame) printf("failed to allocate\n");
-      else {
-        // load from file to frame
-        int a = file_read_at(spte->file, frame, spte->read_bytes, spte->offset);
-        int b = spte->read_bytes > PGSIZE ? PGSIZE : spte->read_bytes;
-        if(spte->read_bytes < PGSIZE)
-          memset(frame + spte->read_bytes, 0, spte->zero_bytes);
-        printf("%d == %d\n", a, b);
-        if (!install_page(spte->uva, frame, spte->writable)) {
-          frame_free(frame);
-          printf("failed to connect\n");
-        }
-        else{
-          printf("succeed to connect\n");
-          spte->is_loaded = true;
-          solved = true;
-        }
-      }
+    if (spte) {
+      solved = load_page(spte);
+    }
+    else if (fault_addr >= f->esp - 32) {
+      solved = expand_stack(fault_addr);
     }
   }
   if (!solved){
@@ -193,9 +177,11 @@ page_fault (struct intr_frame *f)
             user ? "user" : "kernel");
     kill (f);
   }
-  else {
-    print_frame_table();
-    print_page_table();
-  }
+  #ifdef DEBUGTOOL
+    else {
+      print_frame_table();
+      print_page_table();
+    }
+  #endif
 }
 

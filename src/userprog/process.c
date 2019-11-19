@@ -173,13 +173,14 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+         
+      /* Added: destroy sup page table */
+      page_table_destroy(&cur->spt);
+      
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-    
-  /* Added: destroy sup page table */
-  page_table_destroy(&cur->spt);
     
   /* Added: sema up for parent to work again. */
   sema_up(&cur->sema_for_parent);
@@ -407,7 +408,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   //free(argv);
-  file_close (file);
+  //file_close (file);
   return success;
 }
 
@@ -478,7 +479,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -486,23 +486,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
-      /* Get a page of memory. */
-      /*uint8_t *kpage = frame_alloc (PAL_USER, NULL);
-      if (kpage == NULL)
-        return false;
-
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          frame_free (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-      if (!install_page (upage, kpage, writable)) 
-        {
-          frame_free (kpage);
-          return false; 
-        }*/
       
       if (!add_file_to_page_table(file, ofs, upage, page_read_bytes,
 				  page_zero_bytes, writable))
@@ -511,7 +494,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
-      //ofs += page_read_bytes;
+      ofs += page_read_bytes;
       upage += PGSIZE;
     }
   return true;
@@ -526,7 +509,9 @@ setup_stack (void **esp, char **argv, int argc)
   bool success = false;
   
   //printf("palloc open! opened pallocs = %d\n", ++pallocno);
-  printf("stack alloc : ");
+  #ifdef DEBUGTOOL
+    printf("stack alloc : ");
+  #endif
   kpage = frame_alloc (PAL_USER | PAL_ZERO, NULL);
   if (kpage != NULL) 
     {

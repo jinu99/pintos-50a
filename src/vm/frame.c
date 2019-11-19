@@ -35,7 +35,9 @@ void* frame_alloc (enum palloc_flags flags, struct sup_page_elem *spte) {
       
     frame_add_to_table(frame, spte); 
   }*/
-  //print_frame_table(0);
+  #ifdef DEBUGTOOL
+    print_frame_table(0);
+  #endif
   return frame;
 }
 
@@ -54,7 +56,9 @@ void frame_free (void *frame) {
     }
   }
   lock_release(&frame_lock);
-  //print_frame_table(1);
+  #ifdef DEBUGTOOL
+    print_frame_table(1);
+  #endif
 }
 
 void frame_add_to_table (void *frame, struct sup_page_elem *spte)

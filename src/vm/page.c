@@ -74,8 +74,8 @@ bool load_file (struct sup_page_elem *spte)
   if (spte->read_bytes > 0) {
     lock_acquire(&file_lock);
     if ((int) spte->read_bytes != file_read_at(spte->file, frame,
-                            spte->read_bytes,
-                            spte->offset)) {
+                                               spte->read_bytes,
+                                               spte->offset)) {
       lock_release(&file_lock);
       frame_free(frame);
       return false;
@@ -109,7 +109,9 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
   spte->pinned = false;
 
   bool ret = (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
-  //print_page_table();
+  #ifdef DEBUGTOOL
+    print_page_table();
+  #endif
   return ret;
 }
 

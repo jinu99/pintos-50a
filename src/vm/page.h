@@ -1,5 +1,5 @@
-#ifndef VM_PAGE_H
-#define VM_PAGE_H
+#ifndef __VM_PAGE_H
+#define __VM_PAGE_H
 
 #include <hash.h>
 #include "vm/frame.h"
