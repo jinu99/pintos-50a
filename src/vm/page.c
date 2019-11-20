@@ -33,7 +33,7 @@ struct sup_page_elem* get_spte (void *uva) {
 bool load_page (struct sup_page_elem *spte)
 {
   bool success = false;
-  spte->pinned = true;
+  //spte->pinned = true;
   if (spte->is_loaded)
     return success;
   switch (spte->type) {
@@ -58,7 +58,13 @@ bool load_swap (struct sup_page_elem *spte)
     frame_free(frame);
     return false;
   }
-  swap_in(spte->swap_index, spte->uva);
+  #ifdef DEBUGTOOL
+  printf("start swap_in\n");
+  #endif
+  swap_in(spte->swap_index, frame);
+  #ifdef DEBUGTOOL
+  printf("end swap_in\n");
+  #endif
   spte->is_loaded = true;
   return true;
 }

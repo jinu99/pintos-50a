@@ -120,7 +120,7 @@ void* frame_evict (enum palloc_flags flags) {
 	      #ifdef DEBUGTOOL
         printf("4 evict!\n");
         #endif
-	      if (pagedir_is_dirty(t->pagedir, elem->spte->uva) || elem->spte->type == SWAP) {
+	      if (true || pagedir_is_dirty(t->pagedir, elem->spte->uva) || elem->spte->type == SWAP) {
 	        elem->spte->type = SWAP;
           elem->spte->swap_index = swap_out(elem->frame); 
 		    }
