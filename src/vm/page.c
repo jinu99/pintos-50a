@@ -165,7 +165,9 @@ bool expand_stack (void *uva) {
     return false;
   }
 
-  return (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
+  bool ret =  (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
+  print_page_table();
+  return ret;
 }
 
 unsigned page_hash_function (const struct hash_elem *e, void *aux UNUSED) {

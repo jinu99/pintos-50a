@@ -484,6 +484,9 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_for_removing, 0); 
   sema_init(&t->sema_load, 0);		// Added: for sys_exec
   
+  /* Added: to init mmap table for proj 3 */
+  list_init (&t->mmap_table);
+  
   //printf("%s inits %s\n", running_thread()->name, t->name);
   list_push_back(&(running_thread()->child_list), &(t->elem_as_child));
 

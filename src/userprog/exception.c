@@ -157,7 +157,7 @@ page_fault (struct intr_frame *f)
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
   #ifdef DEBUGTOOL
-    printf("PAGE FAULT AT 0x%x\n", fault_addr);
+    printf("PAGE FAULT AT 0x%x for esp 0x%x\n", fault_addr, f->esp);
   #endif
   bool solved = false;
   if (not_present && fault_addr >= 0x08048000 && is_user_vaddr(fault_addr)){

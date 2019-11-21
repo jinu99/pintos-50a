@@ -102,6 +102,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct file * fd[MAX_FD];		/* Added: file descriptor. */
 #endif
+    struct list mmap_table;             /* mmap for Proj 3 */
 
     /* Added: for process_wait(tid) in proj 2 */
     struct list child_list;             /* list of child */

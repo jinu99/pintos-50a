@@ -7,11 +7,12 @@
 #include "threads/vaddr.h"
 #include "userprog/fd.h"
 #include "threads/synch.h"
+#include "vm/page.h"
 
 static void syscall_handler (struct intr_frame *);
 /* Added: check each arguments are valid, and terminate the process if
    the arguments are invalid. */
-bool is_valid_ptr (void * ptr);
+bool is_valid_ptr (void * ptr, void *esp);
 
 void
 syscall_init (void) 
@@ -24,7 +25,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   /* Check whether esp is valid */
-  if (!is_valid_ptr((uint32_t *)f->esp))
+  if (!is_valid_ptr((uint32_t *)f->esp, f->esp))
     sys_exit(-1, f);
     
   /* Added: handle each syscalls */
@@ -53,7 +54,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_EXEC:
       //printf("exec!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1)) 
+      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
       	
       f->eax = process_execute((char*)*(cur_esp + 1));
@@ -68,7 +69,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_CREATE:
       //printf("create!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 2) || strlen((char *)*(cur_esp + 1)) == 0) 
+      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 2) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
       	
       lock_acquire(&file_lock);
@@ -79,7 +80,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_REMOVE:
       //printf("remove!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
+      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
      
       lock_acquire(&file_lock);
@@ -89,7 +90,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_OPEN:
       //printf("open!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1)) || !is_user_vaddr(cur_esp + 1)) 
+      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
 
       lock_acquire(&file_lock);
@@ -115,7 +116,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_READ:
       //printf("read!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 2)) || !is_user_vaddr(cur_esp + 3)) 
+      if (!is_valid_ptr((char *)*(cur_esp + 2), f->esp) || !is_user_vaddr(cur_esp + 3)) 
       	sys_exit(-1, f);
         
       len = (unsigned)*(cur_esp + 3);
@@ -143,7 +144,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       else
       {
         if ((fp = fd_get_file(fd)) != NULL) {
-          f->eax = file_read(fd_get_file(fd), buf, len);
+          #ifdef DEBUGTOOL
+          printf("start reading for file at 0x%x, to 0x%x, length %d\n", fp, buf, len);
+          #endif
+          f->eax = file_read(fp, buf, len);
+          #ifdef DEBUGTOOL
+          printf("end reading\n");
+          #endif
         }
         else f->eax = -1;
       }
@@ -152,7 +159,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_WRITE:
       //printf("write!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 2)) || !is_user_vaddr(cur_esp + 3)) 
+      if (!is_valid_ptr((char *)*(cur_esp + 2), f->esp) || !is_user_vaddr(cur_esp + 3)) 
       	sys_exit(-1, f);
       	
       len = (unsigned)*(cur_esp + 3);
@@ -180,8 +187,12 @@ syscall_handler (struct intr_frame *f UNUSED)
         if (fp != NULL) {
           if (fp->deny_write)
             f->eax = 0;
-          else
+          else{
+            #ifdef DEBUGTOOL
+            printf("start writing for file at 0x%x, to 0x%x, length %d\n", fp, buf, len);
+            #endif
             f->eax = file_write(fd_get_file(fd), buf, len);
+          }
         }
         else f->eax = -1;
       }
@@ -219,12 +230,23 @@ syscall_handler (struct intr_frame *f UNUSED)
    if there are invalid arguments. We should release locks and free
    allocations. */
 bool
-is_valid_ptr (void * ptr)
+is_valid_ptr (void * ptr, void * esp)
 {
-  if (ptr != NULL && is_user_vaddr(ptr))
+  if (ptr != NULL && is_user_vaddr(ptr)){
+    struct sup_page_elem *spte = get_spte(ptr);
     if(pagedir_get_page(thread_current()->pagedir, ptr) != NULL)
       return true;
-  //printf("Your arguments are invalid: %x\n", ptr);
+    else if(spte != NULL){
+      load_page(spte);
+      return spte->is_loaded;
+    }
+    else if (ptr >= esp - 32){
+      #ifdef DEBUGTOOL
+      printf("expand stack for 0x%x for esp 0x%x\n", ptr, esp);
+      #endif
+      return expand_stack(ptr);
+    }
+  }
   return false;
 }
 

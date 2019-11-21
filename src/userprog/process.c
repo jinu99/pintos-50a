@@ -512,10 +512,9 @@ setup_stack (void **esp, char **argv, int argc)
   #ifdef DEBUGTOOL
     printf("stack alloc : ");
   #endif
-  kpage = frame_alloc (PAL_USER | PAL_ZERO, NULL);
-  if (kpage != NULL) 
+  if (true) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      success = expand_stack(((uint8_t *) PHYS_BASE) - PGSIZE);
       if (success)
       {
         *esp = PHYS_BASE;
