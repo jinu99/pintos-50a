@@ -56,7 +56,7 @@ static const char *swap_bdev_name;
 #endif /* FILESYS */
 
 /* -ul: Maximum number of pages to put into palloc's user pool. */
-static size_t user_page_limit = 16;
+static size_t user_page_limit = SIZE_MAX;
 
 static void bss_init (void);
 static void paging_init (void);

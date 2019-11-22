@@ -9,6 +9,7 @@
 #include "userprog/process.h"
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/mmap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -181,6 +182,7 @@ page_fault (struct intr_frame *f)
     else {
       print_frame_table();
       print_page_table();
+      print_mmap_table();
     }
   #endif
 }

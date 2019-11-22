@@ -114,13 +114,10 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
   spte->pinned = false;
 
   bool ret = (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
-  #ifdef DEBUGTOOL
-    print_page_table();
-  #endif
   return ret;
 }
 
-/*bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
+bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
                             uint32_t read_bytes, uint32_t zero_bytes) {
   struct sup_page_elem *spte = malloc(sizeof(struct sup_page_elem));
   if (!spte) return false;
@@ -134,17 +131,16 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
   spte->writable = true;
   spte->pinned = false;
 
-  if (!process_add_mmap(spte)) {
+  if (!add_to_mmap_table(spte)) {
     free(spte);
     return false;
   }
 
   if (hash_insert(&thread_current()->spt, &spte->elem)) {
-    spte->type = HASH_ERROR;
     return false;
   }
   return true;
-}*/
+}
 
 bool expand_stack (void *uva) {
   if (PHYS_BASE - pg_round_down(uva) > MAX_STACK_SIZE)
@@ -166,7 +162,6 @@ bool expand_stack (void *uva) {
   }
 
   bool ret =  (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
-  print_page_table();
   return ret;
 }
 

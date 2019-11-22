@@ -220,6 +220,48 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_close ((int)*(cur_esp + 1), f);
       break;
       
+    case SYS_MMAP:
+      //printf("mmap!\n");
+      if (!is_user_vaddr(cur_esp + 1) || !is_user_vaddr(cur_esp + 2)){
+        sys_exit(-1, f);
+      }
+      if (*(cur_esp + 1) < 2 || !is_user_vaddr(*(cur_esp + 2)) || (*(cur_esp + 2)) % PGSIZE != 0 || (*(cur_esp + 2)) == 0){
+        f->eax = -1;
+        break;
+      }
+      struct file *f_innocent = fd_get_file(*(cur_esp + 1));
+      if (!f_innocent || file_length(f_innocent) == 0){
+        f->eax = -1;
+        break;
+      }
+      struct file *f_for_mmap = file_reopen(f_innocent);
+      int mid = get_mid();
+      int32_t ofs = 0;
+      uint32_t read_bytes = file_length(f_for_mmap);
+      void *upage = *(cur_esp + 2);
+      
+      while(read_bytes > 0){
+        uint32_t page_read_bytes = read_bytes > PGSIZE ? PGSIZE : read_bytes;
+        uint32_t page_zero_bytes = PGSIZE - page_read_bytes;
+        if (!add_mmap_to_page_table(f_for_mmap, ofs, upage, page_read_bytes, page_zero_bytes)){
+          delete_mmap_at_mid(mid);
+          f->eax = -1;
+        }
+        read_bytes -= page_read_bytes;
+        ofs += page_read_bytes;
+        upage += PGSIZE;
+      }
+      f->eax = mid;
+      break;
+    
+    case SYS_MUNMAP:
+      //printf("munmap\n");
+      if (!is_user_vaddr(cur_esp + 1)){
+        sys_exit(-1, f);
+      }
+      delete_mmap_at_mid(*(cur_esp + 1));
+      break;
+        
     default:
       thread_exit();
   }
