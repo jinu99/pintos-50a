@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/mmap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -161,6 +162,12 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /* Added: remove mmap and write to file */
+  int mid_max = get_mid();
+  int i;
+  for (i = 1; i < mid_max; i++)
+    delete_mmap_at_mid(i);
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -180,8 +187,8 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-    }
-    
+    }  
+  
   /* Added: sema up for parent to work again. */
   sema_up(&cur->sema_for_parent);
   /* wait for parent to clean all this' history */

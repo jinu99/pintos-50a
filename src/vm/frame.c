@@ -115,9 +115,16 @@ void* frame_evict (enum palloc_flags flags) {
 	      #ifdef DEBUGTOOL
         printf("4 evict!\n");
         #endif
-	      if (true || pagedir_is_dirty(t->pagedir, elem->spte->uva) || elem->spte->type == SWAP) {
-	        elem->spte->type = SWAP;
-          elem->spte->swap_index = swap_out(elem->frame); 
+	      if (pagedir_is_dirty(t->pagedir, elem->spte->uva) || elem->spte->type == SWAP) {
+	        if (elem->spte->type == MMAP){
+	          lock_acquire(&file_lock);
+	          file_write_at(elem->spte->file, elem->frame, elem->spte->read_bytes, elem->spte->offset);
+	          lock_release(&file_lock);
+	        }
+	        else {
+  	        elem->spte->type = SWAP;
+            elem->spte->swap_index = swap_out(elem->frame); 
+          }
 		    }
 		    #ifdef DEBUGTOOL
         printf("5 evict!\n");

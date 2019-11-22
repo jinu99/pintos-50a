@@ -236,7 +236,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       if (!is_user_vaddr(cur_esp + 1) || !is_user_vaddr(cur_esp + 2)){
         sys_exit(-1, f);
       }
-      if (*(cur_esp + 1) < 2 || !is_user_vaddr(*(cur_esp + 2)) || (*(cur_esp + 2)) % PGSIZE != 0 || (*(cur_esp + 2)) == 0 || *(cur_esp + 2) < 0x10000000 || *(cur_esp + 2) >= f->esp){
+      if (*(cur_esp + 1) < 2 || !is_user_vaddr(*(cur_esp + 2)) || (*(cur_esp + 2)) % PGSIZE != 0 || (*(cur_esp + 2)) == 0 || *(cur_esp + 2) < 0x10000000 || *(cur_esp + 2) >= PHYS_BASE - MAX_STACK_SIZE){
         f->eax = -1;
         break;
       }
@@ -249,7 +249,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       int mid = get_mid();
       int32_t ofs = 0;
       uint32_t read_bytes = file_length(f_for_mmap);
-      void *upage = *(cur_esp + 2);
+      uint8_t *upage = *(cur_esp + 2);
       
       while(read_bytes > 0){
         uint32_t page_read_bytes = read_bytes > PGSIZE ? PGSIZE : read_bytes;
@@ -257,6 +257,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         if (!add_mmap_to_page_table(mid, f_for_mmap, ofs, upage, page_read_bytes, page_zero_bytes)){
           delete_mmap_at_mid(mid);
           f->eax = -1;
+          break;
         }
         read_bytes -= page_read_bytes;
         ofs += page_read_bytes;

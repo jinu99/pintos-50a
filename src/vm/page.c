@@ -203,7 +203,7 @@ void print_page_table(void){
   hash_first(&i, &thread_current()->spt);
   while(hash_next(&i)){
     struct sup_page_elem *elem = hash_entry(hash_cur(&i), struct sup_page_elem, elem);
-    printf("%2d: { AT 0x%x, UVA 0x%x, FILE 0x%x, ofs %d, is_loaded %s, pinned = %s }\n", n++, elem, elem->uva, elem->file, elem->offset, elem->is_loaded ? "yes" : "no", elem->pinned ? "yes" : "no");
+    printf("%2d: { AT 0x%x, UVA 0x%x, TYPE %s, ofs %d, is_loaded %s, pinned = %s }\n", n++, elem, elem->uva, (elem->type == FILE) ? "file" : ((elem->type == SWAP) ? "swap" : "mmap"), elem->offset, elem->is_loaded ? "yes" : "no", elem->pinned ? "yes" : "no");
   }
   printf("=======================================================\n");
 }

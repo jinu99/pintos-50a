@@ -15,9 +15,8 @@ int get_mid(){
   struct mmap_elem *m;
   for (e = list_begin(mmap_table); e != list_end(mmap_table); e = list_next(e)){
     m = list_entry(e, struct mmap_elem, elem);
-    if (val < m->mid){
-      val++;
-      if (val < m->mid) break;
+    if (val <= m->mid){
+      val = m->mid + 1;
     }
   }
   return val;
@@ -37,7 +36,6 @@ void delete_mmap_at_mid (int mid){
   struct list_elem *e, *next;
   struct mmap_elem *m;
   struct file *closing_file;
-  
   e = list_begin(&cur->mmap_table);
   while(e != list_end(&cur->mmap_table)){
     next = list_next(e);
