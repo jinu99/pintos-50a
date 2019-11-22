@@ -9,10 +9,13 @@
 #include "threads/synch.h"
 #include "vm/page.h"
 
+#define SYSDEBUG 0
+
 static void syscall_handler (struct intr_frame *);
 /* Added: check each arguments are valid, and terminate the process if
    the arguments are invalid. */
 bool is_valid_ptr (void * ptr, void *esp);
+bool is_valid_buffer (void * ptr, void * esp, size_t size, bool be_write);
 
 void
 syscall_init (void) 
@@ -25,9 +28,10 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   /* Check whether esp is valid */
+  if (SYSDEBUG) printf("1\n");
   if (!is_valid_ptr((uint32_t *)f->esp, f->esp))
-    sys_exit(-1, f);
-    
+    sys_exit(-1, f); 
+  if (SYSDEBUG) printf("1\n");
   /* Added: handle each syscalls */
   uint32_t *cur_esp = (uint32_t *)f->esp;
   
@@ -40,12 +44,13 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch (*cur_esp)
   {
     case SYS_HALT:
-      //printf("halt!\n");
+      if (SYSDEBUG) printf("halt!\n");
       shutdown_power_off();
       NOT_REACHED();
       break; 
       
     case SYS_EXIT:
+      if (SYSDEBUG) printf("exit!\n");
       if (!is_user_vaddr(cur_esp + 1))
         sys_exit(-1, f);
         
@@ -53,7 +58,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_EXEC:
-      //printf("exec!\n");
+      if (SYSDEBUG) printf("exec!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
       	
@@ -61,14 +66,14 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_WAIT:
-      //printf("wait!\n");
+      if (SYSDEBUG) printf("wait!\n");
       if (!is_user_vaddr(cur_esp + 1))
         sys_exit(-1, f);
       f->eax = process_wait((pid_t)*(cur_esp + 1));
       break;
       
     case SYS_CREATE:
-      //printf("create!\n");
+      if (SYSDEBUG) printf("create!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 2) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
       	
@@ -79,7 +84,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_REMOVE:
-      //printf("remove!\n");
+      if (SYSDEBUG) printf("remove!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
      
@@ -89,7 +94,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_OPEN:
-      //printf("open!\n");
+      if (SYSDEBUG) printf("open!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
 
@@ -107,7 +112,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_FILESIZE:
-      //printf("filesize!\n");
+      if (SYSDEBUG) printf("filesize!\n");
       if (!is_user_vaddr(cur_esp + 1) || (fd = (int)*(cur_esp + 1)) < 3)
         sys_exit(-1, f);
       
@@ -115,11 +120,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_READ:
-      //printf("read!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 2), f->esp) || !is_user_vaddr(cur_esp + 3)) 
-      	sys_exit(-1, f);
-        
+      if (SYSDEBUG) printf("read!\n");
+      if (!is_user_vaddr(cur_esp + 1) || !is_user_vaddr(cur_esp + 3))
+        sys_exit(-1, f);
+      
       len = (unsigned)*(cur_esp + 3);
+      if (!is_valid_buffer ((char *)*(cur_esp + 2), f->esp, len, true)) 
+      	sys_exit(-1, f);
 
       if (len <= 0) { f->eax = 0; break;}
       buf = (char *)*(cur_esp + 2);
@@ -146,7 +153,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         if ((fp = fd_get_file(fd)) != NULL) {
           #ifdef DEBUGTOOL
           printf("start reading for file at 0x%x, to 0x%x, length %d\n", fp, buf, len);
-          #endif
+          #endif.
           f->eax = file_read(fp, buf, len);
           #ifdef DEBUGTOOL
           printf("end reading\n");
@@ -158,8 +165,12 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_WRITE:
-      //printf("write!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 2), f->esp) || !is_user_vaddr(cur_esp + 3)) 
+      if (SYSDEBUG) printf("write!\n");
+      if (!is_user_vaddr(cur_esp + 1) || !is_user_vaddr(cur_esp + 3))
+        sys_exit(-1, f);
+      
+      len = (unsigned)*(cur_esp + 3);
+      if (!is_valid_buffer ((char *)*(cur_esp + 2), f->esp, len, false)) 
       	sys_exit(-1, f);
       	
       len = (unsigned)*(cur_esp + 3);
@@ -200,7 +211,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_SEEK:
-      //printf("seek!\n");
+      if (SYSDEBUG) printf("seek!\n");
       if (!is_user_vaddr(cur_esp + 2) || (fd = (int)*(cur_esp + 1)) < 3)
         sys_exit(-1, f);
         
@@ -208,7 +219,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;      
       
     case SYS_TELL:
-      //printf("tell!\n");
+      if (SYSDEBUG) printf("tell!\n");
       if (!is_user_vaddr(cur_esp + 1) || (fd = (int)*(cur_esp + 1)) < 3)
         sys_exit(-1, f);
         
@@ -216,12 +227,12 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
       
     case SYS_CLOSE:
-      //printf("close!\n");
+      if (SYSDEBUG) printf("close!\n");
       sys_close ((int)*(cur_esp + 1), f);
       break;
       
     case SYS_MMAP:
-      //printf("mmap!\n");
+      if (SYSDEBUG) printf("mmap!\n");
       if (!is_user_vaddr(cur_esp + 1) || !is_user_vaddr(cur_esp + 2)){
         sys_exit(-1, f);
       }
@@ -255,7 +266,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     
     case SYS_MUNMAP:
-      //printf("munmap\n");
+      if (SYSDEBUG) printf("munmap\n");
       if (!is_user_vaddr(cur_esp + 1)){
         sys_exit(-1, f);
       }
@@ -274,14 +285,15 @@ syscall_handler (struct intr_frame *f UNUSED)
 bool
 is_valid_ptr (void * ptr, void * esp)
 {
-  if (ptr != NULL && is_user_vaddr(ptr)){
+  if (SYSDEBUG) printf("ptr = 0x%08x\n", ptr);
+  if (ptr != NULL && is_user_vaddr(ptr) && ptr > 0x08048000){
     struct sup_page_elem *spte = get_spte(ptr);
-    if(pagedir_get_page(thread_current()->pagedir, ptr) != NULL)
-      return true;
-    else if(spte != NULL){
+    if(spte != NULL){
       load_page(spte);
       return spte->is_loaded;
     }
+    else if(pagedir_get_page(thread_current()->pagedir, ptr) != NULL)
+      return true;
     else if (ptr >= esp - 32){
       #ifdef DEBUGTOOL
       printf("expand stack for 0x%x for esp 0x%x\n", ptr, esp);
@@ -290,6 +302,22 @@ is_valid_ptr (void * ptr, void * esp)
     }
   }
   return false;
+}
+
+bool 
+is_valid_buffer (void * ptr, void * esp, size_t size, bool be_write) 
+{
+  size_t i;
+  void *p = ptr;
+  struct sup_page_elem *spte;
+  
+  for (i = 0; i < size; i++) {
+    if (!is_valid_ptr(p, esp)) return false;
+    spte = get_spte(p);
+    if (spte && be_write && !spte->writable) return false;
+    p++;
+  }
+  return true;
 }
 
 void 
