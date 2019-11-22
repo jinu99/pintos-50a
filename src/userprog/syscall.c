@@ -76,7 +76,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       if (SYSDEBUG) printf("create!\n");
       if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 2) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
-      	
       lock_acquire(&file_lock);
       if (strlen((char *)*(cur_esp + 1)) > 14) f->eax = 0;
       else f->eax = filesys_create((char *)*(cur_esp + 1), (unsigned)*(cur_esp + 2));
@@ -251,9 +250,16 @@ syscall_handler (struct intr_frame *f UNUSED)
       uint32_t read_bytes = file_length(f_for_mmap);
       uint8_t *upage = *(cur_esp + 2);
       
+      f->eax = mid;
       while(read_bytes > 0){
         uint32_t page_read_bytes = read_bytes > PGSIZE ? PGSIZE : read_bytes;
         uint32_t page_zero_bytes = PGSIZE - page_read_bytes;
+        /* disallow memory overlapping */
+        if (get_spte(upage) != NULL){
+          delete_mmap_at_mid(mid);
+          f->eax = -1;
+          break;
+        }
         if (!add_mmap_to_page_table(mid, f_for_mmap, ofs, upage, page_read_bytes, page_zero_bytes)){
           delete_mmap_at_mid(mid);
           f->eax = -1;
@@ -263,7 +269,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         ofs += page_read_bytes;
         upage += PGSIZE;
       }
-      f->eax = mid;
       break;
     
     case SYS_MUNMAP:

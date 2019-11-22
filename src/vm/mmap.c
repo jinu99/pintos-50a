@@ -35,7 +35,7 @@ void delete_mmap_at_mid (int mid){
   struct thread *cur = thread_current();
   struct list_elem *e, *next;
   struct mmap_elem *m;
-  struct file *closing_file;
+  struct file *closing_file = NULL;
   e = list_begin(&cur->mmap_table);
   while(e != list_end(&cur->mmap_table)){
     next = list_next(e);
