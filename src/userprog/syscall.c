@@ -236,7 +236,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       if (!is_user_vaddr(cur_esp + 1) || !is_user_vaddr(cur_esp + 2)){
         sys_exit(-1, f);
       }
-      if (*(cur_esp + 1) < 2 || !is_user_vaddr(*(cur_esp + 2)) || (*(cur_esp + 2)) % PGSIZE != 0 || (*(cur_esp + 2)) == 0){
+      if (*(cur_esp + 1) < 2 || !is_user_vaddr(*(cur_esp + 2)) || (*(cur_esp + 2)) % PGSIZE != 0 || (*(cur_esp + 2)) == 0 || *(cur_esp + 2) < 0x10000000 || *(cur_esp + 2) >= f->esp){
         f->eax = -1;
         break;
       }
@@ -285,7 +285,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 bool
 is_valid_ptr (void * ptr, void * esp)
 {
-  if (SYSDEBUG) printf("ptr = 0x%08x\n", ptr);
   if (ptr != NULL && is_user_vaddr(ptr) && ptr > 0x08048000){
     struct sup_page_elem *spte = get_spte(ptr);
     if(spte != NULL){
