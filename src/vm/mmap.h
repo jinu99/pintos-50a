@@ -13,7 +13,7 @@ struct mmap_elem {
 /* return minimum blank mid */
 int get_mid(void);
 /* add mmap_elem to current thread's mmap list */
-bool add_to_mmap_table (struct sup_page_elem *spte);
+bool add_to_mmap_table (int mid, struct sup_page_elem *spte);
 void delete_mmap_at_mid (int mid);
 /* print mmap table */
 void print_mmap_table();

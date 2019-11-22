@@ -243,7 +243,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       while(read_bytes > 0){
         uint32_t page_read_bytes = read_bytes > PGSIZE ? PGSIZE : read_bytes;
         uint32_t page_zero_bytes = PGSIZE - page_read_bytes;
-        if (!add_mmap_to_page_table(f_for_mmap, ofs, upage, page_read_bytes, page_zero_bytes)){
+        if (!add_mmap_to_page_table(mid, f_for_mmap, ofs, upage, page_read_bytes, page_zero_bytes)){
           delete_mmap_at_mid(mid);
           f->eax = -1;
         }

@@ -117,7 +117,7 @@ bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
   return ret;
 }
 
-bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
+bool add_mmap_to_page_table(int mid, struct file *file, int32_t ofs, uint8_t *upage,
                             uint32_t read_bytes, uint32_t zero_bytes) {
   struct sup_page_elem *spte = malloc(sizeof(struct sup_page_elem));
   if (!spte) return false;
@@ -131,7 +131,7 @@ bool add_mmap_to_page_table(struct file *file, int32_t ofs, uint8_t *upage,
   spte->writable = true;
   spte->pinned = false;
 
-  if (!add_to_mmap_table(spte)) {
+  if (!add_to_mmap_table(mid, spte)) {
     free(spte);
     return false;
   }
