@@ -143,14 +143,17 @@ bool add_mmap_to_page_table(int mid, struct file *file, int32_t ofs, uint8_t *up
 }
 
 bool expand_stack (void *uva) {
-  if (PHYS_BASE - pg_round_down(uva) > MAX_STACK_SIZE)
+  if ((size_t)(PHYS_BASE - pg_round_down(uva)) > MAX_STACK_SIZE)
     return false;
   
   struct sup_page_elem *spte = (struct sup_page_elem *) malloc(sizeof(struct sup_page_elem));
   if (!spte) return false;
   
   spte->uva = pg_round_down(uva);
+  spte->is_loaded = true;
   spte->writable = true;
+  spte->type = SWAP;
+  spte->pinned = true;
   
   void *frame = frame_alloc(PAL_USER, spte);
   if (!frame) { free(spte); return false; }
@@ -162,6 +165,9 @@ bool expand_stack (void *uva) {
   }
 
   bool ret =  (hash_insert(&thread_current()->spt, &spte->elem) == NULL);
+  #ifdef DEBUGTOOL
+  print_page_table();
+  #endif
   return ret;
 }
 
