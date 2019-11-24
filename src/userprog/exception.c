@@ -178,12 +178,5 @@ page_fault (struct intr_frame *f)
             user ? "user" : "kernel");
     kill (f);
   }
-  #ifdef DEBUGTOOL
-    else {
-      print_frame_table();
-      print_page_table();
-      print_mmap_table();
-    }
-  #endif
 }
 

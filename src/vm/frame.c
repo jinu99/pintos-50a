@@ -93,7 +93,10 @@ void* frame_evict (enum palloc_flags flags) {
       #endif
       hash_next(&i);
       if (!(i.elem)) { 
-        if (!pin_check)  { lock_release(&frame_lock); return NULL; }
+        if (!pin_check)  { 
+          lock_release(&frame_lock); 
+          PANIC ("All Frames in Memory is Pinned!"); 
+        }
         hash_first (&i, &frame_table); hash_next (&i); }
       continue;
     }
@@ -147,7 +150,10 @@ void* frame_evict (enum palloc_flags flags) {
     #endif
     hash_next(&i);
     if (!(i.elem)) { 
-      if (!pin_check) { lock_release(&frame_lock); return NULL; }
+      if (!pin_check) { 
+        lock_release(&frame_lock); 
+        PANIC ("All Frames in Memory is Pinned!"); 
+      }
       hash_first (&i, &frame_table); hash_next (&i); }
   }
   #ifdef DEBUGTOOL

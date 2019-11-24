@@ -15,7 +15,11 @@ static void syscall_handler (struct intr_frame *);
 /* Added: check each arguments are valid, and terminate the process if
    the arguments are invalid. */
 bool is_valid_ptr (void * ptr, void *esp);
+bool is_valid_string (void * ptr, void * esp);
 bool is_valid_buffer (void * ptr, void * esp, size_t size, bool be_write);
+void setpin_ptr(void * ptr, bool pin);
+void setpin_string (void * ptr, bool pin);
+void setpin_buffer (void * ptr, size_t size, bool pin);
 
 void
 syscall_init (void) 
@@ -59,10 +63,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_EXEC:
       if (SYSDEBUG) printf("exec!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
+      if (!is_valid_string((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
       	
       f->eax = process_execute((char*)*(cur_esp + 1));
+      setpin_string((void *)*(cur_esp + 1), false);
       break;
       
     case SYS_WAIT:
@@ -74,27 +79,29 @@ syscall_handler (struct intr_frame *f UNUSED)
       
     case SYS_CREATE:
       if (SYSDEBUG) printf("create!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 2) || strlen((char *)*(cur_esp + 1)) == 0) 
+      if (!is_valid_string((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 2) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
       lock_acquire(&file_lock);
       if (strlen((char *)*(cur_esp + 1)) > 14) f->eax = 0;
       else f->eax = filesys_create((char *)*(cur_esp + 1), (unsigned)*(cur_esp + 2));
       lock_release(&file_lock);
+      setpin_string((void *)*(cur_esp + 1), false);
       break;
       
     case SYS_REMOVE:
       if (SYSDEBUG) printf("remove!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
+      if (!is_valid_string((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
      
       lock_acquire(&file_lock);
       f->eax = filesys_remove((char *)*(cur_esp + 1));	
       lock_release(&file_lock);
+      setpin_string((void *)*(cur_esp + 1), false);
       break;
       
     case SYS_OPEN:
       if (SYSDEBUG) printf("open!\n");
-      if (!is_valid_ptr((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
+      if (!is_valid_string((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1)) 
       	sys_exit(-1, f);
 
       lock_acquire(&file_lock);
@@ -108,6 +115,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       else
         f->eax = -1;
       lock_release(&file_lock);
+      setpin_string((void *)*(cur_esp + 1), false);
       break;
       
     case SYS_FILESIZE:
@@ -161,6 +169,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         else f->eax = -1;
       }
       lock_release(&file_lock);
+      setpin_buffer((void *)*(cur_esp + 2), (size_t) len, false);
       break;
       
     case SYS_WRITE:
@@ -207,6 +216,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         else f->eax = -1;
       }
       lock_release(&file_lock);
+      setpin_buffer((void *)*(cur_esp + 2), len, false);
       break;
       
     case SYS_SEEK:
@@ -282,6 +292,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     default:
       thread_exit();
   }
+  setpin_ptr(cur_esp, false);
   //printf("Survive Signal %d at %x!\n", *cur_esp, cur_esp);
 }
 
@@ -295,6 +306,7 @@ is_valid_ptr (void * ptr, void * esp)
     struct sup_page_elem *spte = get_spte(ptr);
     if(spte != NULL){
       load_page(spte);
+      setpin_ptr(ptr, spte->is_loaded);
       return spte->is_loaded;
     }
     else if(pagedir_get_page(thread_current()->pagedir, ptr) != NULL)
@@ -307,6 +319,18 @@ is_valid_ptr (void * ptr, void * esp)
     }
   }
   return false;
+}
+
+bool
+is_valid_string (void * ptr, void * esp)
+{
+  char * p = (char *)ptr;
+  if (!is_valid_ptr((void *) p, esp)) return false;
+  while(*p != 0){
+    if (!is_valid_ptr((void *) p, esp)) return false;
+    p++;
+  }
+  return true;
 }
 
 bool 
@@ -323,6 +347,29 @@ is_valid_buffer (void * ptr, void * esp, size_t size, bool be_write)
     p++;
   }
   return true;
+}
+
+void
+setpin_ptr(void * ptr, bool pin) {
+  get_spte(ptr)->pinned = pin;
+}
+
+void setpin_string (void * ptr, bool pin){
+  char * p = (char *) ptr;
+  setpin_ptr(p, pin);
+  while (*p != 0){
+    setpin_ptr(p, pin);
+    p++;
+  }
+}
+
+void setpin_buffer (void * ptr, size_t size, bool pin){
+  unsigned i;
+  char *p = (char *) ptr;
+  for (i = 0; i < size; i++){
+    setpin_ptr(p, pin);
+    p++;
+  }
 }
 
 void 

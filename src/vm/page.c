@@ -33,7 +33,7 @@ struct sup_page_elem* get_spte (void *uva) {
 bool load_page (struct sup_page_elem *spte)
 {
   bool success = false;
-  //spte->pinned = true;
+  spte->pinned = true;
   if (spte->is_loaded)
     return success;
   switch (spte->type) {
@@ -47,6 +47,7 @@ bool load_page (struct sup_page_elem *spte)
       success = load_file(spte);
       break;
   }
+  spte->pinned = false;
   return success;
 }
 
@@ -168,6 +169,8 @@ bool expand_stack (void *uva) {
   #ifdef DEBUGTOOL
   print_page_table();
   #endif
+  if(intr_context())
+    spte->pinned = false;
   return ret;
 }
 
