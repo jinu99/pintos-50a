@@ -47,7 +47,8 @@ bool load_page (struct sup_page_elem *spte)
       success = load_file(spte);
       break;
   }
-  spte->pinned = false;
+  if(intr_context())
+    spte->pinned = false;
   return success;
 }
 
