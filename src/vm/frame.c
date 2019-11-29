@@ -18,7 +18,7 @@ void frame_table_init (void) {
   lock_init(&frame_lock);
 }
 
-void* frame_alloc (enum palloc_flags flags, struct sup_page_elem *spte) {
+void* frame_allocate (enum palloc_flags flags, struct sup_page_elem *spte) {
   if ((flags & PAL_USER) == 0)
     return NULL;
       
@@ -29,7 +29,7 @@ void* frame_alloc (enum palloc_flags flags, struct sup_page_elem *spte) {
   if (frame)
     frame_add_to_table(frame, spte);    
   else {
-    frame = frame_evict(flags);
+    frame = frame_swap_out(flags);
     if (!frame)
       PANIC ("Frame could not be evicted because swap is full!");
       
@@ -67,7 +67,7 @@ void frame_add_to_table (void *frame, struct sup_page_elem *spte)
   lock_release(&frame_lock);
 }
 
-void* frame_evict (enum palloc_flags flags) {
+void* frame_swap_out (enum palloc_flags flags) {
   struct hash_iterator i, j;
   bool pin_check = false;
   lock_acquire(&frame_lock);

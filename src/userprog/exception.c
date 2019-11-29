@@ -164,7 +164,7 @@ page_fault (struct intr_frame *f)
   if (not_present && fault_addr >= 0x08048000 && is_user_vaddr(fault_addr)){
     struct sup_page_elem *spte = get_spte(fault_addr);
     if (spte) {
-      solved = load_page(spte);
+      solved = lazy_load(spte);
     }
     else if (fault_addr >= f->esp - 32) {
       solved = expand_stack(fault_addr);

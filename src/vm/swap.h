@@ -12,11 +12,11 @@
 #define SECTORS_PER_PAGE (PGSIZE / BLOCK_SECTOR_SIZE)
 
 struct lock swap_lock;
-struct block *swap_block;
-struct bitmap *swap_map;
+struct block *block_for_swap;
+struct bitmap *map_for_swap;
 
 void swap_init(void);
-void swap_in(size_t used_index, void* frame);
+void swap_in(size_t used_idx, void* frame);
 size_t swap_out(void* frame);
 
 #endif /* vm/page.h */

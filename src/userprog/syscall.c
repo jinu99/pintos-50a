@@ -305,7 +305,7 @@ is_valid_ptr (void * ptr, void * esp)
   if (ptr != NULL && is_user_vaddr(ptr) && ptr > 0x08048000){
     struct sup_page_elem *spte = get_spte(ptr);
     if(spte != NULL){
-      load_page(spte);
+      lazy_load(spte);
       setpin_ptr(ptr, spte->is_loaded);
       return spte->is_loaded;
     }

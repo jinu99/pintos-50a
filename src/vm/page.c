@@ -30,7 +30,7 @@ struct sup_page_elem* get_spte (void *uva) {
   return hash_entry (e, struct sup_page_elem, elem);
 }
 
-bool load_page (struct sup_page_elem *spte)
+bool lazy_load (struct sup_page_elem *spte)
 {
   bool success = false;
   spte->pinned = true;
@@ -38,23 +38,22 @@ bool load_page (struct sup_page_elem *spte)
     return success;
   switch (spte->type) {
     case FILE:
-      success = load_file(spte);
+      success = from_file(spte);
       break;
     case SWAP:
-      success = load_swap(spte);
+      success = from_swap(spte);
       break;
     case MMAP:
-      success = load_file(spte);
+      success = from_file(spte);
       break;
   }
-  if(intr_context())
-    spte->pinned = false;
+  spte->pinned = false;
   return success;
 }
 
-bool load_swap (struct sup_page_elem *spte)
+bool from_swap (struct sup_page_elem *spte)
 {
-  uint8_t *frame = frame_alloc (PAL_USER, spte);
+  uint8_t *frame = frame_allocate (PAL_USER, spte);
   if (!frame) return false;
   if (!install_page(spte->uva, frame, spte->writable)) {  
     frame_free(frame);
@@ -71,12 +70,12 @@ bool load_swap (struct sup_page_elem *spte)
   return true;
 }
 
-bool load_file (struct sup_page_elem *spte)
+bool from_file (struct sup_page_elem *spte)
 {
   enum palloc_flags flags = PAL_USER;
   if (spte->read_bytes == 0)
     flags |= PAL_ZERO;
-  uint8_t *frame = frame_alloc(flags, spte);
+  uint8_t *frame = frame_allocate(flags, spte);
   if (!frame) return false;
   if (spte->read_bytes > 0) {
     lock_acquire(&file_lock);
@@ -157,7 +156,7 @@ bool expand_stack (void *uva) {
   spte->type = SWAP;
   spte->pinned = true;
   
-  void *frame = frame_alloc(PAL_USER, spte);
+  void *frame = frame_allocate(PAL_USER, spte);
   if (!frame) { free(spte); return false; }
   
   if (!install_page(spte->uva, frame, spte->writable)) {
