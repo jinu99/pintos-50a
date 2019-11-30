@@ -245,7 +245,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       if (!is_user_vaddr(cur_esp + 1) || !is_user_vaddr(cur_esp + 2)){
         sys_exit(-1, f);
       }
-      if (*(cur_esp + 1) < 2 || !is_user_vaddr(*(cur_esp + 2)) || (*(cur_esp + 2)) % PGSIZE != 0 || (*(cur_esp + 2)) == 0 || *(cur_esp + 2) < 0x10000000 || *(cur_esp + 2) >= PHYS_BASE - MAX_STACK_SIZE){
+      if (*(cur_esp + 1) < 2 || !is_user_vaddr(*(cur_esp + 2)) || (*(cur_esp + 2)) % PGSIZE != 0 || (*(cur_esp + 2)) == 0 || *(cur_esp + 2) < 0x10000000 || *(cur_esp + 2) >= PHYS_BASE - STACK_GROW_MAX){
         f->eax = -1;
         break;
       }
@@ -270,7 +270,7 @@ syscall_handler (struct intr_frame *f UNUSED)
           f->eax = -1;
           break;
         }
-        if (!add_mmap_to_page_table(mid, f_for_mmap, ofs, upage, page_read_bytes, page_zero_bytes)){
+        if (!locate_mmap_to_table(mid, f_for_mmap, ofs, upage, page_read_bytes, page_zero_bytes)){
           delete_mmap_at_mid(mid);
           f->eax = -1;
           break;

@@ -9,7 +9,7 @@
 #define MMAP 2
 #define HASH_ERROR 3
 
-#define MAX_STACK_SIZE (1 << 23) // 8MB
+#define STACK_GROW_MAX (1 << 23) // 8MB
 
 struct sup_page_elem {
 	uint8_t type;
@@ -31,24 +31,23 @@ struct sup_page_elem {
 	struct hash_elem elem;
 };
 
-void page_table_init (struct hash *spt);
-void page_table_destroy (struct hash *spt);
+void page_table_init (struct hash*);
+void page_table_destroy (struct hash*);
+struct sup_page_elem* get_spte (void*);
 
-bool lazy_load (struct sup_page_elem *spte);
-bool load_mmap (struct sup_page_elem *spte);
-bool from_swap (struct sup_page_elem *spte);
-bool from_file (struct sup_page_elem *spte);
-bool add_file_to_page_table (struct file *file, int32_t ofs, uint8_t *upage,
-                             uint32_t read_bytes, uint32_t zero_bytes,
-                             bool writable);
-bool add_mmap_to_page_table(int mid, struct file *file, int32_t ofs, uint8_t *upage,
-                            uint32_t read_bytes, uint32_t zero_bytes);
-bool expand_stack (void *uva);
-struct sup_page_elem* get_spte (void *uva);
+bool lazy_load (struct sup_page_elem*);
+bool from_file (struct sup_page_elem*);
+bool from_swap (struct sup_page_elem*);
 
-unsigned page_hash_function (const struct hash_elem *e, void *aux UNUSED);
-bool page_less_function (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
-void page_action_function (struct hash_elem *e, void *aux UNUSED);
+bool locate_file_to_table (struct file*, int32_t, uint8_t*,
+                           uint32_t, uint32_t, bool);
+bool locate_mmap_to_table(int, struct file*, int32_t, uint8_t*,
+                          uint32_t, uint32_t);
+bool expand_stack (void*);
+
+unsigned page_hash_function (const struct hash_elem*, void*);
+bool page_less_function (const struct hash_elem*, const struct hash_elem*, void*);
+void page_action_function (struct hash_elem*, void*);
 void print_page_table(void);
 
 #endif /* vm/page.h */
