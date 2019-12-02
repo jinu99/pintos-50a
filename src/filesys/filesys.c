@@ -21,9 +21,9 @@ filesys_init (bool format)
   if (fs_device == NULL)
     PANIC ("No file system device found, can't initialize file system.");
 
+  cache_init(); // Added: initialize cache
   inode_init ();
   free_map_init ();
-  cache_init(); // Added: initialize cache
 
   if (format) 
     do_format ();
@@ -37,6 +37,7 @@ void
 filesys_done (void) 
 {
   free_map_close ();
+  cache_term ();
 }
 
 /* Creates a file named NAME with the given INITIAL_SIZE.
@@ -70,9 +71,13 @@ filesys_open (const char *name)
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
 
+  printf("1!!!!!\n\n\n\n\n");
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
+  printf("2!!!!!\n\n\n\n\n");
   dir_close (dir);
+  
+  printf("3!!!!!\n\n\n\n\n");
 
   return file_open (inode);
 }

@@ -91,6 +91,7 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  printf("load %s!! %s, 0x%08x, 0x%08x\n", success ? "succeed" : "failed", file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   //printf("palloc freed! opened pallocs = %d\n", --pallocno);
