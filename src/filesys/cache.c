@@ -16,26 +16,47 @@ bool cache_read (block_sector_t sector_idx, void* buffer,
   /* block_read 함수를 이용해, 디스크 블록 데이터를 buffer cache로 read */
   /* memcpy 함수를 통해, buffer에 디스크 블록 데이터를 복사 */
   /* buffer_head의 clock bit을 setting */
+  struct cache_entry *c = cache_lookup(sector_idx);
+  if (!c){
+    c = cache_select_victim();
+    if (!c)
+      return false;
+    lock_acquire(&c->cache_lock);
+    c->sector = sector_idx;
+    block_read(fs_device, c->sector, &c->block);
+    c->dirty = true;
+    c->accessed = true;
+    lock_release(&c->cache_lock);
+  }
+  
+  /* 제작 중단 */
 }
 
 bool cache_write (block_sector_t sector_idx, void* buffer, 
                   off_t bytes_written, int chunk_size, int sector_ofs) {
-  bool success = false;
-  
-  /* sector_idx를 buffer_head에서 검색하여 buffer에 복사 */
-  /* update buffer head */
-  
-  return success;  
+  struct cache_entry *c = cache_lookup(sector_idx);
+  if (!c)
+    c =  cache_select_victim();
+  if (!c)
+    return false;
+  lock_acquire(&c->cache_lock);
+  memcpy((uint8_t*) sector_idx + sector_ofs, buffer + bytes_written, chunk_size);
+  lock_release(&c->cache_lock);
+  return true;  
 }
 
 void cache_term () {
-  /* bc_flush_all_entries함수를 호출하여 모든 buffer cache entry를 디스크로 flush */
-  /* buffer cache 영역 할당 해제 */
+  cache_flush_all_entries ();
 }
 
 struct cache_entry* cache_lookup (block_sector_t sector) { 
-  /* buffe_head를 순회하며, 전달받은 sector 값과 동일한 sector 값을 갖는 buffer cache entry가 있는지 확인 */
-  /* 성공: 찾은 buffer_head 반환, 실패: NULL */
+  struct cache_entry *c;
+  for (int i = 0; i < BUFFER_CACHE_ENTRY_NB; i++){
+    c = &(cache_list[i]);
+    if (c->sector == sector)
+      return c;
+  }
+  return NULL;
 }
 
 struct cache_entry* cache_select_victim (void) {
@@ -47,11 +68,27 @@ struct cache_entry* cache_select_victim (void) {
 }  
 
 void cache_flush_entry (struct cache_entry* p_flush_entry) {
-  /* block_write 을 호출하여, 인자로 전달받은 buffer cache entry의 데이터를 디스크로 flush */
-  /* buffer_head의 dirty 값 update */ 
+  if (p_flush_entry){
+    lock_acquire(&p_flush_entry->cache_lock);
+    if (p_flush_entry->valid && p_flush_entry->dirty){
+      block_write(fs_device, p_flush_entry->sector, &p_flush_entry->cache_block);
+      p_flush_entry->dirty = false;
+    }
+    lock_release(&p_flush_entry->cache_lock);
+  }
 }
 
 void cache_flush_all_entries(void){
-  /* 전역변수 buffer_head를 순회하며, dirty인 entry는 block_write 함수를 호출하여 디스크로 flush */
-  /* 디스크로 flush한 후, buffer_head의 dirty 값 update */
+  struct cache_entry *c;
+  for (int i = 0; i < BUFFER_CACHE_ENTRY_NB; i++){
+    c = &(cache_list[i]);
+    if (!c->valid) continue;
+    lock_acquire(&c->cache_lock);
+    /* If dirty bit is true, then save changed to the disk. */
+    if (c->dirty){
+      block_write(fs_device, c->sector, &c->cache_block);
+      c->dirty = false;
+    }    
+    lock_release(&c->cache_lock);
+  }
 }
