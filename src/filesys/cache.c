@@ -1,4 +1,5 @@
 #include "filesys/cache.h"
+#include "filesys/filesys.h"
 
 void cache_init () {
   for (int i = 0; i < BUFFER_CACHE_ENTRY_NB; i++) {
@@ -11,11 +12,17 @@ void cache_init () {
 
 bool cache_read (block_sector_t sector_idx, void* buffer, 
                  off_t bytes_read, int chunk_size, int sector_ofs) {
-  /* sector_idx를 buffer_head에서 검색 (bc_lookup 함수 이용) */
-  /* 검색결과가 없을 경우, 디스크 블록을 캐싱할 buffer entry의 buffer_head를 구함 (bc_select_victim 함수 이용) */
-  /* block_read 함수를 이용해, 디스크 블록 데이터를 buffer cache로 read */
-  /* memcpy 함수를 통해, buffer에 디스크 블록 데이터를 복사 */
-  /* buffer_head의 clock bit을 setting */
+  struct cache_entry *entry = cache_lookup (sector_idx);
+  if (!entry) entry = cache_select_victim ();
+  
+  lock_acquire(entry->cache_lock);
+  
+  block_read (fs_device, entry->sector, &entry->cache_block);
+  if (sector_ofs != 0)
+    memcpy (buffer + bytes_read, &entry->cache_block + sector_ofs, chunk_size);
+  entry->clock = true;
+  
+  lock_release(entry->cache_lock);
 }
 
 bool cache_write (block_sector_t sector_idx, void* buffer, 
