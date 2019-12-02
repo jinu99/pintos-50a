@@ -4,6 +4,8 @@
 #include <list.h>
 #include <stdbool.h>
 #include "devices/block.h"
+#include "threads/synch.h"
+#include "filesys/off_t.h"
 
 #define BUFFER_CACHE_ENTRY_NB 64
 
@@ -18,7 +20,7 @@ struct cache_entry {
   uint8_t cache_block[BLOCK_SECTOR_SIZE];
   
   struct lock cache_lock;
-}
+};
 
 struct cache_entry cache_list[BUFFER_CACHE_ENTRY_NB];
 
@@ -28,7 +30,7 @@ bool cache_write (block_sector_t, void *, off_t, int, int);
 void cache_term ();
 
 struct cache_entry* cache_lookup (block_sector_t);
-struct cache_entry* cache_select_victim ();
+struct cache_entry* cache_select_victim (block_sector_t);
 
 void cache_flush_entry (struct cache_entry* p_flush_entry);
 void cache_flush_all_entries ();
