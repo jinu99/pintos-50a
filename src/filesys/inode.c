@@ -10,14 +10,43 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
+/* Added for inode_disk */
+#define DIRECT_BLOCK_ENTRIES   123
+#define INDIRECT_BLOCK_ENTRIES BLOCK_SECTOR_SIZE / sizeof (block_sector_t)
+
+/* Added : cases of ways of pointing blocks */
+enum direct_t 
+  {
+    NORMAL_DIRECT,
+    INDIRECT,
+    DOUBLE_INDIRECT,
+    OUT_LIMIT         // bad case
+  };
+
+/* Added : data structure to access blocks */
+struct sector_location 
+  {
+    enum direct_t directness;
+    block_sector_t index1;
+    block_sector_t index2;
+  };
+
+/* Added : data structure of indirect block */
+struct inode_indirect_block
+  {
+    block_sector_t map_table[INDIRECT_BLOCK_ENTRIES];
+  };
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    block_sector_t start;               /* First data sector. */
-    off_t length;                       /* File size in bytes. */
-    unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    off_t length;                                      /* File size in bytes. */
+    unsigned magic;                                    /* Magic number. */
+
+    block_sector_t direct_table[DIRECT_BLOCK_ENTRIES]; /* Added */
+    block_sector_t indirect_block;                     /* Added */
+    block_sector_t double_indirect_block;              /* Added */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -36,7 +65,7 @@ struct inode
     int open_cnt;                       /* Number of openers. */
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    struct inode_disk data;             /* Inode content. */
+    struct lock extend_lock;            /* Added */
   };
 
 /* Returns the block device sector that contains byte offset POS
@@ -298,3 +327,45 @@ inode_length (const struct inode *inode)
 {
   return inode->data.length;
 }
+
+/* Added : get inode from buffer cache */
+bool
+get_disk_inode (const struct inode *inode, struct inode_disk *inode_disk)
+{
+  return cache_read (inode->sector, inode_disk, 0,
+                     sizeof (struct inode_disk), 0);
+}
+
+/* Added : set offset */
+void
+locate_byte (off_t pos, struct sector_location *location)
+{
+  off_t pos_sector = pos / BLOCK_SECTOR_SIZE;
+  off_t bound1 = DIRECT_BLOCK_ENTRIES;
+  off_t bound2 = bound1 + INDIRECT_BLOCK_ENTRIES;
+  off_t bound3 = bound2 + INDIRECT_BLOCK_ENTRIES * INDIRECT_BLOCK_ENTRIES;
+
+  if (pos_sector < bound1) {
+    location->directness = NORMAL_DIRECT;
+    location->index1 = pos_sector;
+  }
+  else if (pos_sector < bound2) {
+    location->directness = INDIRECT;
+    location->index1 = pos_sector
+  }
+  else if (pos_sector < bound3) {
+    location->directness = DOUBLE_INDIRECT;
+    location->index1 = pos_sector / INDIRECT_BLOCK_ENTRIES;
+    location->index2 = pos_sector % INDIRECT_BLOCK_ENTRIES;
+  }
+  else location->directness = OUT_LIMIT;
+}
+
+
+
+
+
+
+
+
+
