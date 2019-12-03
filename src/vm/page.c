@@ -210,7 +210,7 @@ void page_action_function (struct hash_elem *e, void *aux UNUSED) {
 void print_page_table(void){
   struct hash_iterator i;
   int n = 0;
-  
+
   printf("=======================================================\n");
   hash_first(&i, &thread_current()->spt);
   while(hash_next(&i)){
