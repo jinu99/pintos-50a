@@ -2,7 +2,7 @@
 #include "filesys/cache.h"
 #include "filesys/filesys.h"
 
-#define cache_debug 1
+#define cache_debug 0
 
 void cache_init () {
   for (int i = 0; i < BUFFER_CACHE_ENTRY_NB; i++) {
@@ -17,17 +17,17 @@ void cache_init () {
 bool cache_read (block_sector_t sector_idx, void* buffer, 
                  off_t bytes_read, int chunk_size, int sector_ofs) {
   struct cache_entry *entry = cache_lookup (sector_idx);
-  if (!entry) { printf("victim!\n"); entry = cache_select_victim (sector_idx); block_read (fs_device, entry->sector, &entry->cache_block); }
+  if (!entry) { if (cache_debug) printf("victim!\n"); entry = cache_select_victim (sector_idx); block_read (fs_device, entry->sector, entry->cache_block); }
   if (!entry) return false;
   
   if (cache_debug) printf("read on!\n");
   
-  if (cache_debug)print_cache_list();
+  if (cache_debug) print_cache_list();
   
   lock_acquire(&entry->cache_lock);
   
   //block_read (fs_device, entry->sector, &entry->cache_block);
-  memcpy (buffer + bytes_read, &entry->cache_block + sector_ofs, chunk_size);
+  memcpy (buffer + bytes_read, entry->cache_block + sector_ofs, chunk_size);
   entry->clock = true;
   
   lock_release(&entry->cache_lock);
@@ -39,7 +39,7 @@ bool cache_read (block_sector_t sector_idx, void* buffer,
 bool cache_write (block_sector_t sector_idx, void* buffer, 
                   off_t bytes_written, int chunk_size, int sector_ofs) {
   struct cache_entry *entry = cache_lookup(sector_idx);
-  if (!entry) { printf("victim!\n"); entry = cache_select_victim (sector_idx); block_read (fs_device, entry->sector, &entry->cache_block); }
+  if (!entry) { if (cache_debug) printf("victim!\n"); entry = cache_select_victim (sector_idx); block_read (fs_device, entry->sector, entry->cache_block); }
   if (!entry) return false;
   
   if (cache_debug) printf("write on!\n");
@@ -48,7 +48,7 @@ bool cache_write (block_sector_t sector_idx, void* buffer,
   
   lock_acquire(&entry->cache_lock);
   
-  memcpy(&entry->cache_block + sector_ofs, buffer + bytes_written, chunk_size);
+  memcpy(entry->cache_block + sector_ofs, buffer + bytes_written, chunk_size);
   entry->clock = true;
   entry->dirty = true;
   
@@ -104,7 +104,7 @@ void cache_flush_entry (struct cache_entry* p_flush_entry) {
     lock_acquire(&p_flush_entry->cache_lock);
     
     if (p_flush_entry->valid && p_flush_entry->dirty){
-      block_write(fs_device, p_flush_entry->sector, &p_flush_entry->cache_block);
+      block_write(fs_device, p_flush_entry->sector, p_flush_entry->cache_block);
       p_flush_entry->dirty = false;
     }
     
@@ -115,6 +115,7 @@ void cache_flush_entry (struct cache_entry* p_flush_entry) {
 void cache_flush_all_entries () {
   for (int i = 0; i < BUFFER_CACHE_ENTRY_NB; i++)
     cache_flush_entry(&(cache_list[i]));
+  if (cache_debug) print_cache_list();
 }
 
 void print_cache_list() {

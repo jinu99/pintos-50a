@@ -120,9 +120,7 @@ fsutil_extract (char **argv UNUSED)
           /* Create destination file. */
           if (!filesys_create (file_name, size))
             PANIC ("%s: create failed", file_name);
-          printf("1efffef~!!!!!!!\n");
           dst = filesys_open (file_name);
-          printf("2efffef~!!!!!!!\n");
           if (dst == NULL)
             PANIC ("%s: open failed", file_name);
 

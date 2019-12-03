@@ -202,8 +202,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-
-  printf("inode_Read on!\n");
   
   while (size > 0) 
     {
@@ -229,8 +227,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       bytes_read += chunk_size;
     }
 
-  printf("inode_Read off!\n");
-
   return bytes_read;
 }
 
@@ -248,8 +244,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
     return 0;
-    
-  printf("inode_write on!\n");
 
   while (size > 0) 
     {
@@ -274,8 +268,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       offset += chunk_size;
       bytes_written += chunk_size;
     }
-  
-  printf("inode_write off!\n");
 
   return bytes_written;
 }

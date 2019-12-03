@@ -97,8 +97,6 @@ lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
   
-  printf("lookup on!\n");
-  
   inode_read_at (dir->inode, &e, sizeof e, ofs);
   
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
@@ -109,11 +107,9 @@ lookup (const struct dir *dir, const char *name,
           *ep = e;
         if (ofsp != NULL)
           *ofsp = ofs;
-        printf("lookup off!\n");
         return true;
       }
       
-  printf("false!!!! in dir, lookup\n");
   return false;
 }
 
@@ -134,8 +130,6 @@ dir_lookup (const struct dir *dir, const char *name,
     *inode = inode_open (e.inode_sector);
   else
     *inode = NULL;
-    
-  printf("dir -> %d\n", *inode);
 
   return *inode != NULL;
 }
