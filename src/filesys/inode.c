@@ -351,7 +351,7 @@ locate_byte (off_t pos, struct sector_location *location)
   }
   else if (pos_sector < bound2) {
     location->directness = INDIRECT;
-    location->index1 = pos_sector
+    location->index1 = pos_sector;
   }
   else if (pos_sector < bound3) {
     location->directness = DOUBLE_INDIRECT;
@@ -361,8 +361,39 @@ locate_byte (off_t pos, struct sector_location *location)
   else location->directness = OUT_LIMIT;
 }
 
+/* Added : convert sector offset to byte offset */
+off_t
+map_table_offset (int index)
+{
+  return (off_t) index * sizeof (block_sector_t);
+}
 
-
+bool
+register_sector (struct inode_disk *inode_disk, block_sector_t new_sector, 
+                 struct sector_location sec_loc)
+{
+  
+  switch (sec_loc.directness){
+    case NORMAL_DIRECT:
+      inode_disk->
+      break;
+      
+    case INDIRECT:
+      /* inode_disk에 새로 할당받은 디스크 번호 업데이트 */
+      break;
+      
+    case DOUBLE_INDIRECT:
+      /* inode_disk에 새로 할당받은 디스크 번호 업데이트 */
+      break;
+      
+    case OUT_LIMIT:
+      /* inode_disk에 새로 할당받은 디스크 번호 업데이트 */
+      break;
+      
+    default :
+      NOT_REACHED ();
+      
+  }
 
 
 
