@@ -355,17 +355,15 @@ locate_byte (off_t pos, struct sector_location *location)
   }
   else if (pos_sector < bound3) {
     location->directness = DOUBLE_INDIRECT;
-    location->index1 = pos_sector / INDIRECT_BLOCK_ENTRIES;
-    location->index2 = pos_sector % INDIRECT_BLOCK_ENTRIES;
+    location->index2 = pos_sector / INDIRECT_BLOCK_ENTRIES;
+    location->index1 = pos_sector % INDIRECT_BLOCK_ENTRIES;
   }
   else location->directness = OUT_LIMIT;
 }
 
-/* Added : convert sector offset to byte offset */
 off_t
-map_table_offset (int index)
-{
-  return (off_t) index * sizeof (block_sector_t);
+map_table_offset (int index) {
+  return index * sizeof (block_sector_t);
 }
 
 bool
@@ -395,8 +393,49 @@ register_sector (struct inode_disk *inode_disk, block_sector_t new_sector,
       
   }
 
+block_sector_t
+byte_to_sector (struct inode_disk *inode_disk, off_t pos)
+{
+  block_sector_t result;
 
+  if (pos < inode_disk->length) {
+    struct inode_indirect_block *ind_block;
+    struct sector_location sec_loc;
+    locate_byte (pos, &sec_loc);
 
+    switch (sec_loc.directness) {
+      case NORMAL_DIRECT:
+        result = inode_disk->direct_map_table[sec_loc.index1];
+        break;
 
+      case INDIRECT:
+        ind_block = (struct inode_indirect_block *) malloc (BLOCK_SECTOR_SIZE);
+        if (!ind_block) result = -1;
+        
+        if (!cache_read(inode_disk->indirect_block, &ind_block, 0, sizeof (struct inode_indirect_block), 0))
+          result = -1;
 
+        result = ind_block.map_table[sec_loc.index1];
+        free (ind_block);
+        break;
 
+      case DOUBLE_INDIRECT:
+        ind_block = (struct inode_indirect_block *) malloc (BLOCK_SECTOR_SIZE);
+        if (!ind_block) result = -1;
+
+        if (!cache_read(inode_disk->double_indirect_block, &ind_block, 0, sizeof (struct inode_indirect_block), 0))
+          result = -1;
+
+        if (!cache_read(ind_block.map_table[sec_loc.index2], &ind_block, 0, sizeof (struct inode_indirect_block), 0))
+          result = -1;
+
+        result = ind_block.map_table[sec_loc.index1];
+        free (ind_block);
+        break;
+
+      case OUT_LIMIT:
+      default : 
+        NOT_REACHED ();
+    }
+  }
+}
