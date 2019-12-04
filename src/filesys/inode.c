@@ -351,12 +351,14 @@ locate_byte (off_t pos, struct sector_location *location)
   }
   else if (pos_sector < bound2) {
     location->directness = INDIRECT;
+    pos_sector -= bound1;
     location->index1 = pos_sector;
   }
   else if (pos_sector < bound3) {
     location->directness = DOUBLE_INDIRECT;
-    location->index2 = pos_sector / INDIRECT_BLOCK_ENTRIES;
-    location->index1 = pos_sector % INDIRECT_BLOCK_ENTRIES;
+    pos_sector -= bound2;
+    location->index1 = pos_sector / INDIRECT_BLOCK_ENTRIES;
+    location->index2 = pos_sector % INDIRECT_BLOCK_ENTRIES;
   }
   else location->directness = OUT_LIMIT;
 }
@@ -370,27 +372,47 @@ bool
 register_sector (struct inode_disk *inode_disk, block_sector_t new_sector, 
                  struct sector_location sec_loc)
 {
+  struct inode_indirect_block new_block, new_ind_block;
   
-  switch (sec_loc.directness){
+  switch (sec_loc.directness) {
     case NORMAL_DIRECT:
-      inode_disk->
-      break;
+      inode_disk->direct_table[sec_loc.index1] = new_sector;
+      return true;
       
     case INDIRECT:
-      /* inode_disk에 새로 할당받은 디스크 번호 업데이트 */
-      break;
+      new_block = (struct inode_indirect_block *) malloc (BLOCK_SECTOR_SIZE);
+      if (!new_block) return false;
+      
+      new_block.map_table[sec_loc.index1] = new_sector;
+      if (!cache_write(inode_disk->indirect_block, &new_block, 0, sizeof (struct inode_indirect_block), 0))
+        return false;
+      
+      free (new_block);
+      return true;
       
     case DOUBLE_INDIRECT:
-      /* inode_disk에 새로 할당받은 디스크 번호 업데이트 */
-      break;
+      new_block = (struct inode_indirect_block *) malloc (BLOCK_SECTOR_SIZE);
+      if (!new_block) return false;
+      
+      new_ind_block = (struct inode_indirect_block *) malloc (BLOCK_SECTOR_SIZE);
+      if (!new_ind_block) return false;
+      
+      new_ind_block.map_table[sec_loc.index2] = new_sector;
+      
+      if (!cache_write(inode_disk->double_indirect_block, &new_block, 0, sizeof (struct inode_indirect_block), 0))
+        return false;
+      if (!cache_write(new_block.map_table[sec_loc.index1], &new_ind_block, 0, sizeof (struct inode_indirect_block), 0))
+        return false;
+      
+      free (new_block);
+      free (new_ind_block);
+      return true;
       
     case OUT_LIMIT:
-      /* inode_disk에 새로 할당받은 디스크 번호 업데이트 */
-      break;
+      return false;
       
     default :
       NOT_REACHED ();
-      
   }
 
 block_sector_t
@@ -434,8 +456,97 @@ byte_to_sector (struct inode_disk *inode_disk, off_t pos)
         break;
 
       case OUT_LIMIT:
+        result = -1;
+        break;
+        
       default : 
         NOT_REACHED ();
     }
   }
+  
+  return result;
 }
+
+bool
+inode_update_file_length (struct inode_disk* inode_disk, off_t start_pos, off_t end_pos)
+{
+  static uint8_t zeros[BLOCK_SECTOR_SIZE];
+  int len = inode_disk->length;
+  int new_len = end_pos - start_pos;
+  int size = new_len - len;
+  
+  /* 블록 단위로 loop을 수행하며 새로운 디스크 블록 할당 */
+  while (size > 0) {
+    /* 디스크 블록 내 오프셋 계산 */
+    block_sector_t sector_ofs = byte_to_sector (inode_disk, length);
+    
+    if (sector_ofs > 0) {
+      /* 블록 오프셋이 0보다 클 경우, 이미 할당된 블록 */
+    }
+    else {
+      /* 새로운 디스크 블록을 할당 */
+      
+      if (free_map_allocate(1, &sector_idx)) {
+        /* inode_disk에 새로 할당받은 디스크 블록 번호 업데이트 */ 
+      }
+      else {
+        free(zeroes);
+        return false;
+      }
+      /* 새로운 디스크 블록을 0으로 초기화 */
+      bc_write(sector_idx, zeroes, 0, BLOCK_SECTOR_SIZE, 0);
+    }
+    /* Advance. */ 
+    size -= chunk_size;
+    offset += chunk_size;
+  }
+  
+  free(zeroes);
+  return true;
+}
+
+void
+free_inode_sectors (struct inode_disk* inode_disk)
+{
+  /* Double indirect 방식으로 할당된 블록 해지 */
+  if (inode_disk->double_indirect_block_sec > 0) { 
+    /* 1차 인덱스 블록을 buffer cache에서 읽음*/
+    i = 0;
+    /* 1차 인덱스 블록을 통해 2차 인덱스 블록을 차례로 접근 */
+    while (ind_block_1->map_table[i] > 0){
+      /* 2차 인덱스 블록을 buffer cache에서 읽음 */ 
+      j = 0;
+      /* 2차 인덱스 블록에 저장된 디스크 블록 번호를 접근 */
+      while (ind_block_2->map_table[j] > 0) {
+        /* free_map 업데이틀 통해 디스크 블록 할당 해지 */
+        j++;
+      }
+      /* 2차 인덱스 블록 할당 해지 */
+      i++;
+    }
+    /* 1차 인덱스 블록 할당 해지 */
+    ...
+  }
+  
+  /* Indirect 방식으로 할당된 디스크 블록 해지 */
+  if (inode_disk->indirect_block_sec > 0){
+    ...
+    /* 인덱스 블록을 buffer cache에서 읽음 */
+    /* 인덱스 블록에 저장된 디스크 블록 번호를 접근 */
+    while (ind_block->map_table[i] > 0) {
+      /* free_map 업데이트를 통해 디스크블록 할당 해지 */
+      i++;
+    }
+    ...
+    /* Direct 방식으로 할당된 디스크 블록 해지 */
+      while (inode_disk->direct_map_table[i] > 0) {
+        /* free_map업데이트를통해디스크블록할당해지*/
+      i++;
+    }
+  }
+}
+
+
+
+
+

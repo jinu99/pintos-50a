@@ -17,11 +17,15 @@ void cache_init () {
 bool cache_read (block_sector_t sector_idx, void* buffer, 
                  off_t bytes_read, int chunk_size, int sector_ofs) {
   struct cache_entry *entry = cache_lookup (sector_idx);
-  if (!entry) { if (cache_debug) printf("victim!\n"); entry = cache_select_victim (sector_idx); block_read (fs_device, entry->sector, entry->cache_block); }
+  
+  if (!entry) { 
+    if (cache_debug) printf("victim!\n"); 
+    entry = cache_select_victim (sector_idx); 
+    block_read (fs_device, entry->sector, entry->cache_block); }
+    
   if (!entry) return false;
   
   if (cache_debug) printf("read on!\n");
-  
   if (cache_debug) print_cache_list();
   
   lock_acquire(&entry->cache_lock);
@@ -39,11 +43,15 @@ bool cache_read (block_sector_t sector_idx, void* buffer,
 bool cache_write (block_sector_t sector_idx, void* buffer, 
                   off_t bytes_written, int chunk_size, int sector_ofs) {
   struct cache_entry *entry = cache_lookup(sector_idx);
-  if (!entry) { if (cache_debug) printf("victim!\n"); entry = cache_select_victim (sector_idx); block_read (fs_device, entry->sector, entry->cache_block); }
+  
+  if (!entry) { 
+    if (cache_debug) printf("victim!\n"); 
+    entry = cache_select_victim (sector_idx); 
+    block_read (fs_device, entry->sector, entry->cache_block); }
+    
   if (!entry) return false;
   
   if (cache_debug) printf("write on!\n");
-  
   if (cache_debug) print_cache_list();
   
   lock_acquire(&entry->cache_lock);
