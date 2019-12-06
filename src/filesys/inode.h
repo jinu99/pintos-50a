@@ -20,4 +20,14 @@ void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 
+/* Added functions */
+bool get_disk_inode (const struct inode *inode, struct inode_disk *inode_disk);
+void locate_byte (off_t pos, struct sector_location *location);
+off_t map_table_offset (int index);
+bool register_sector (struct inode_disk *inode_disk, block_sector_t new_sector,
+                 struct sector_location sec_loc);
+block_sector_t byte_to_sector (struct inode_disk *inode_disk, off_t pos);
+bool inode_update_file_length (struct inode_disk *inode_disk, off_t start_pos, off_t end_pos);
+void free_inode_sectors (struct inode_disk* inode_disk);
+
 #endif /* filesys/inode.h */
