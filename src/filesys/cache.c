@@ -17,25 +17,27 @@ void cache_init () {
 bool cache_read (block_sector_t sector_idx, void* buffer, 
                  off_t bytes_read, int chunk_size, int sector_ofs) {
   struct cache_entry *entry = cache_lookup (sector_idx);
-  
+ 
   if (!entry) { 
     if (cache_debug) printf("victim!\n"); 
     entry = cache_select_victim (sector_idx); 
-    block_read (fs_device, entry->sector, entry->cache_block); }
-    
+    block_read (fs_device, sector_idx, entry->cache_block); 
+  } 
   if (!entry) return false;
   
   if (cache_debug) printf("read on!\n");
-  if (cache_debug) print_cache_list();
   
   lock_acquire(&entry->cache_lock);
   
   //block_read (fs_device, entry->sector, &entry->cache_block);
+  if (cache_debug) printf("???????!! bf = 0x%08x, bytes = 0x%08x, cb = 0x%08x \n\n", buffer, bytes_read, entry->cache_block);
   memcpy (buffer + bytes_read, entry->cache_block + sector_ofs, chunk_size);
+  if (cache_debug) printf("?????????????????????????????\n\n\n");
   entry->clock = true;
   
   lock_release(&entry->cache_lock);
   
+  if (cache_debug) print_cache_list();
   if (cache_debug) printf("read off!\n");
   return true;
 }
@@ -47,12 +49,12 @@ bool cache_write (block_sector_t sector_idx, void* buffer,
   if (!entry) { 
     if (cache_debug) printf("victim!\n"); 
     entry = cache_select_victim (sector_idx); 
-    block_read (fs_device, entry->sector, entry->cache_block); }
+    block_read (fs_device, sector_idx, entry->cache_block); 
+  }
     
   if (!entry) return false;
   
   if (cache_debug) printf("write on!\n");
-  if (cache_debug) print_cache_list();
   
   lock_acquire(&entry->cache_lock);
   
@@ -62,6 +64,8 @@ bool cache_write (block_sector_t sector_idx, void* buffer,
   
   lock_release(&entry->cache_lock);
   
+  if (cache_debug) print_cache_list();
+
   if (cache_debug) printf("write off!\n");
   return true;
 }
@@ -76,7 +80,7 @@ struct cache_entry* cache_lookup (block_sector_t sector) {
   for (int i = 0; i < BUFFER_CACHE_ENTRY_NB; i++){
     entry = &(cache_list[i]);
     
-    if (entry->sector == sector)
+    if (entry->sector == sector && entry->valid)
       return entry;
   }
   
