@@ -2,6 +2,7 @@
 #include <debug.h>
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "filesys/filesys.h"
 
 /* An open file. */
 struct file;
@@ -163,4 +164,10 @@ file_tell (struct file *file)
 {
   ASSERT (file != NULL);
   return file->pos;
+}
+
+/* Added: check this file is about directory */
+bool file_is_directory (struct file *fp){
+  struct inode *inode = file_get_inode(fp);
+  return is_directory_inode(inode);
 }

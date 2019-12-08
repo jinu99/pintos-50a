@@ -14,10 +14,12 @@
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    block_sector_t start;               /* First data sector. */
+    // Added to code: BLOCK_SECTOR_SIZE = 512 Byte.
+    block_sector_t start;               /* First data sector.*/
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    uint32_t isDir;                     /* 0: for file inode 1: for directory inode */
+    uint32_t unused[124];               /* Not used. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -70,7 +72,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, uint32_t isDir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -87,6 +89,7 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->isDir = isDir;    /* Added to know this is for dir or file */
       if (free_map_allocate (sectors, &disk_inode->start)) 
         {
           block_write (fs_device, sector, disk_inode);
@@ -180,7 +183,6 @@ inode_close (struct inode *inode)
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length)); 
         }
-
       free (inode); 
     }
 }
@@ -263,6 +265,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   while (size > 0) 
     {
+      //printf("size %d > 0 ", size);
       /* Sector to write, starting byte offset within sector. */
       block_sector_t sector_idx = byte_to_sector (inode, offset);
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
@@ -274,30 +277,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       /* Number of bytes to actually write into this sector. */
       int chunk_size = size < min_left ? size : min_left;
+      //printf("inode_left %d\nsector_left %d\nmin_left %d\n", inode_left, sector_left, min_left);
+      //printf("chunk size: %d\n", chunk_size);
       if (chunk_size <= 0)
         break;
 
       cache_write (sector_idx, buffer, bytes_written, chunk_size, sector_ofs);
-      /*if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
-        {
-          block_write (fs_device, sector_idx, buffer + bytes_written);
-        }
-      else 
-        {
-          if (bounce == NULL) 
-            {
-              bounce = malloc (BLOCK_SECTOR_SIZE);
-              if (bounce == NULL)
-                break;
-            }
-          if (sector_ofs > 0 || chunk_size < sector_left) 
-            block_read (fs_device, sector_idx, bounce);
-          else
-            memset (bounce, 0, BLOCK_SECTOR_SIZE);
-          memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
-          block_write (fs_device, sector_idx, bounce);
-        }
-        */
+      
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
@@ -332,4 +318,9 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+/* Added: return whether the inode is for directory or file */
+bool is_directory_inode (struct inode * inode){
+  return (inode->data.isDir == 1);
 }

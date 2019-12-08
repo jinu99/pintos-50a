@@ -17,4 +17,10 @@ bool filesys_create (const char *name, off_t initial_size);
 struct file *filesys_open (const char *name);
 bool filesys_remove (const char *name);
 
+/* Added: parse and go to the target directory and store file name to second parameter. */
+struct dir *dir_parse_and_open(char *, char *);
+/* Added: system call handler */
+bool filesys_mkdir(char *);
+bool filesys_chdir(char *);
+
 #endif /* filesys/filesys.h */

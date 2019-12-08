@@ -114,6 +114,9 @@ struct thread
     
     /* Added: for managing virtual memory */
     struct hash spt;                    /* Added: thread's supplementary page table */
+    
+    /* Added: for save current directory (Subdirectory) */
+    struct dir *cur_dir;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

@@ -36,4 +36,7 @@ void file_seek (struct file *, off_t);
 off_t file_tell (struct file *);
 off_t file_length (struct file *);
 
+/* Added: return if the file object is about directory */
+bool file_is_directory (struct file *);
+
 #endif /* filesys/file.h */

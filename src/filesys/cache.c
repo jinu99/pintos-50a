@@ -35,7 +35,6 @@ bool cache_write (block_sector_t sector_idx, void* buffer,
 
   if (!entry) entry = cache_select_victim(sector_idx);
   if (!entry) return false;
-  
   lock_acquire(&entry->cache_lock);
   
   memcpy(entry->cache_block + sector_ofs, buffer + bytes_written, chunk_size);
@@ -43,6 +42,7 @@ bool cache_write (block_sector_t sector_idx, void* buffer,
   entry->dirty = true;
   
   lock_release(&entry->cache_lock);
+  cache_flush_all_entries();
   return true;
 }
 
@@ -111,6 +111,6 @@ void cache_flush_all_entries () {
 void print_cache_list () {
   printf("==============================================================\n");
   for (int i = 0; i < 6; i++)
-    printf("%2d: {Valid %s, Dirty %s, Clock %s, Sector %d}\n", i, cache_list[i].valid ? "yes" : "no", cache_list[i].dirty ? "yes" : "no", cache_list[i].clock ? "yes" : "no", cache_list[i].sector);
+    if (cache_list[i].valid) printf("%2d: { Dirty %s, Clock %s, Sector %d }\n", i, cache_list[i].dirty ? "yes" : "no", cache_list[i].clock ? "yes" : "no", cache_list[i].sector);
   printf("==============================================================\n");
 }

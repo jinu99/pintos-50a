@@ -102,6 +102,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  
+  /* Added: init cur_dir to NULL */
+  initial_thread->cur_dir = NULL;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -202,6 +205,10 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+
+  /* Added: before running child thread, inherit the current directory to child. */
+  if (thread_current()->cur_dir != NULL)
+    t->cur_dir = dir_reopen(thread_current()->cur_dir);
 
   /* Add to run queue. */
   thread_unblock (t);

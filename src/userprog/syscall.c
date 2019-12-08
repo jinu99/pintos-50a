@@ -8,6 +8,8 @@
 #include "userprog/fd.h"
 #include "threads/synch.h"
 #include "vm/page.h"
+#include "filesys/inode.h"
+#include "filesys/file.h"
 
 #define SYSDEBUG 0
 
@@ -92,7 +94,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       if (SYSDEBUG) printf("remove!\n");
       if (!is_valid_string((char *)*(cur_esp + 1), f->esp) || !is_user_vaddr(cur_esp + 1) || strlen((char *)*(cur_esp + 1)) == 0) 
       	sys_exit(-1, f);
-     
+
       lock_acquire(&file_lock);
       f->eax = filesys_remove((char *)*(cur_esp + 1));	
       lock_release(&file_lock);
@@ -203,17 +205,15 @@ syscall_handler (struct intr_frame *f UNUSED)
       {
         /* if fp is the file pointer of current file, do not write */
         fp = fd_get_file(fd);
-        if (fp != NULL) {
-          if (fp->deny_write)
-            f->eax = 0;
-          else{
-            #ifdef DEBUGTOOL
-            printf("start writing for file at 0x%x, to 0x%x, length %d\n", fp, buf, len);
-            #endif
+        if (!fp || file_is_directory(fp)){
+          f->eax = -1;
+        }
+        else {
+          if (fp->deny_write) f->eax = 0;
+          else {
             f->eax = file_write(fd_get_file(fd), buf, len);
           }
         }
-        else f->eax = -1;
       }
       lock_release(&file_lock);
       setpin_buffer((void *)*(cur_esp + 2), len, false);
@@ -288,7 +288,65 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
       delete_mmap_at_mid(*(cur_esp + 1));
       break;
-        
+      
+    case SYS_ISDIR:
+      if (!is_user_vaddr(cur_esp + 1)) sys_exit(-1, f);
+      fd = *(cur_esp + 1);
+      fp = fd_get_file(fd);
+      if (fp == NULL)
+        PANIC ("Not valid fd!\n");
+      f->eax = is_directory_inode (fp->inode);
+      break;
+      
+    case SYS_CHDIR:
+      if (!is_valid_string((char *)*(cur_esp + 1), f->esp)) sys_exit(-1, f);
+      f->eax = filesys_chdir((char *)*(cur_esp + 1));
+      break;
+    
+    case SYS_MKDIR:
+      if (!is_valid_string((char *)*(cur_esp + 1), f->esp)) sys_exit(-1, f);
+      f->eax = filesys_mkdir((char *)*(cur_esp + 1));
+      break;
+    
+    case SYS_READDIR:
+      if(!is_user_vaddr(cur_esp + 1) || !is_valid_string((char *)*(cur_esp + 2), f->esp)) sys_exit(-1, f);
+      fd = *(cur_esp + 1);
+      fp = fd_get_file(fd);
+
+      if (!fp) sys_exit(-1, f);
+
+      struct inode *inode = file_get_inode(fp);
+
+      if(!inode || !is_directory_inode(inode)){
+        f->eax = false;
+        break;
+      }
+      struct dir *dir_to_read = dir_open(inode);
+      if (!dir_to_read){
+        f->eax = false;
+        break;
+      }
+      
+      off_t *readpoint = (off_t *) fp + 1;
+      bool result = true;
+      for(i = 0; i <= *readpoint; i++){
+        result = dir_readdir(dir_to_read, (char *)*(cur_esp + 2));
+        if (!result) break;
+      }
+      if (i > *readpoint) (*readpoint)++;
+      
+      dir_close(dir_to_read);
+      f->eax = result;
+      
+      break;
+    
+    case SYS_INUMBER:
+      if(!is_user_vaddr(cur_esp + 1)) sys_exit(-1, f);
+      fp = fd_get_file(*(cur_esp + 1));
+      if(!fp) sys_exit(-1, f);
+      f->eax = inode_get_inumber(file_get_inode(fp));
+      break;
+      
     default:
       thread_exit();
   }

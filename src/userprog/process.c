@@ -162,6 +162,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /* Added: free cur_dir */
+  if (cur->cur_dir != NULL)
+    free(cur->cur_dir);
+  
   /* Added: remove mmap and write to file */
   int mid_max = get_mid();
   int i;
