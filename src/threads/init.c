@@ -124,12 +124,12 @@ main (void)
   serial_init_queue ();
   timer_calibrate ();
   
-#ifdef FILESYS
+
   /* Initialize file system. */
   ide_init ();
   locate_block_devices ();
   filesys_init (format_filesys);
-#endif
+
   
   /* Added for Swap slot init */
   swap_init();

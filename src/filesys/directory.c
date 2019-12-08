@@ -96,7 +96,9 @@ lookup (const struct dir *dir, const char *name,
   size_t ofs;
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
+  
+  inode_read_at (dir->inode, &e, sizeof e, ofs);
+  
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) 
     if (e.in_use && !strcmp (name, e.name)) 
@@ -107,6 +109,7 @@ lookup (const struct dir *dir, const char *name,
           *ofsp = ofs;
         return true;
       }
+      
   return false;
 }
 

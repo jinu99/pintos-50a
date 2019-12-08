@@ -23,9 +23,9 @@ filesys_init (bool format)
   if (fs_device == NULL)
     PANIC ("No file system device found, can't initialize file system.");
 
+  cache_init(); // Added: initialize cache
   inode_init ();
   free_map_init ();
-  cache_init(); // Added: initialize cache
 
   if (format) 
     do_format ();
@@ -42,6 +42,7 @@ void
 filesys_done (void) 
 {
   free_map_close ();
+  cache_term ();
 }
 
 /* Creates a file named NAME with the given INITIAL_SIZE.
@@ -56,6 +57,7 @@ filesys_create (const char *name, off_t initial_size)
   char file_name[NAME_MAX + 1];
   
   struct dir *dir = dir_parse_and_open(name, file_name);
+
   bool success = (dir != NULL) && free_map_allocate (1, &inode_sector)
                                && inode_create (inode_sector, initial_size, 0)
                                && dir_add (dir, file_name, inode_sector);
@@ -171,7 +173,7 @@ struct dir *dir_parse_and_open(char *path, char *file_name){
   
   if (!tempdir) return NULL;
   if (!dir_lookup((const struct dir *)tempdir, ".", &tempinode)) return NULL;
-  
+
   char *token, *oldtoken, *save_ptr = NULL;
   char cp_path[256];
   strlcpy(cp_path, path, 255);
@@ -199,7 +201,6 @@ struct dir *dir_parse_and_open(char *path, char *file_name){
   if (oldtoken) strlcpy(file_name, oldtoken, NAME_MAX);
   else if (token) strlcpy(file_name, token, NAME_MAX);
   else strlcpy(file_name, "", NAME_MAX);
-
   return tempdir;
 }
 
