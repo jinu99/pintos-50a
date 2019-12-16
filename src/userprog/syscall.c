@@ -335,7 +335,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
       if (i > *readpoint) (*readpoint)++;
       
-      dir_close(dir_to_read);
       f->eax = result;
       
       break;

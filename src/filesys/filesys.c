@@ -129,11 +129,10 @@ filesys_remove (const char *name)
   else if((dir_to_remove = dir_open(inode)) && !dir_readdir(dir_to_remove, nouse)){
     success = dir_remove(dir_to_remove, ".")
            && dir_remove(dir, file_name);
+    dir_close(dir_to_remove);
   }
   dir_close (dir); 
   
-  /* the case that dir_to_remove is not closed */
-  if (dir_to_remove) dir_close(dir_to_remove);
   return success;
 }
 
@@ -198,9 +197,9 @@ struct dir *dir_parse_and_open(char *path, char *file_name){
     oldtoken = token;
     token = strtok_r(NULL, "/", &save_ptr);
   }
-  if (oldtoken) strlcpy(file_name, oldtoken, NAME_MAX);
-  else if (token) strlcpy(file_name, token, NAME_MAX);
-  else strlcpy(file_name, "", NAME_MAX);
+  if (oldtoken) strlcpy(file_name, oldtoken, NAME_MAX + 1);
+  else if (token) strlcpy(file_name, token, NAME_MAX + 1);
+  else strlcpy(file_name, "", NAME_MAX + 1);
   return tempdir;
 }
 
