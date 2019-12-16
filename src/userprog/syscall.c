@@ -334,7 +334,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         if (!result) break;
       }
       if (i > *readpoint) (*readpoint)++;
-      
       f->eax = result;
       
       break;
